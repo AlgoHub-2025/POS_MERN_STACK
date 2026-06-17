@@ -38,6 +38,10 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
 )
 
 const RegisterPage: React.FC = () => <PlaceholderPage title="Register" />
+const PurchasesPage: React.FC = () => <PlaceholderPage title="Purchases" />
+const HelpPage: React.FC = () => <PlaceholderPage title="Help & Support" />
+const ProfilePage: React.FC = () => <PlaceholderPage title="Profile" />
+const NotificationsPage: React.FC = () => <PlaceholderPage title="Notifications" />
 
 function App() {
   // Use Redux state for authentication, with localStorage fallback for demo login
@@ -84,6 +88,10 @@ function App() {
           <Route path="employees" element={<EmployeeManagementPage />} />
           <Route path="security" element={<AdvancedAuthPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="purchases" element={<PurchasesPage />} />
+          <Route path="help" element={<HelpPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="review" element={<PlaceholderPage title="Review" />} />
         </Route>
 

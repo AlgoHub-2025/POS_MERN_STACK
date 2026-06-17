@@ -9,7 +9,6 @@ import {
   User,
   Wifi,
   WifiOff,
-  Clock,
   Printer,
   X,
   Check,
@@ -27,18 +26,11 @@ import {
   Keyboard,
   Maximize2,
   Minimize2,
-  ChevronDown
 } from 'lucide-react'
-import { CartItem, Transaction } from '@/types'
-import { productApi, Product } from '@/services/productService'
+import { CartItem, Product, Transaction } from '@/types'
+import { productApi } from '@/services/productService'
 
 // Mock data
-const MOCK_CUSTOMERS = [
-  { id: '1', name: 'John Doe', email: 'john@example.com', phone: '555-0100', tier: 'gold', points: 250 },
-  { id: '2', name: 'Jane Smith', email: 'jane@example.com', phone: '555-0101', tier: 'silver', points: 120 },
-  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', phone: '555-0102', tier: 'bronze', points: 45 },
-]
-
 const MOCK_PRODUCTS: Product[] = [
   // Beverages - Coffee
   { id: '1', name: 'Espresso', price: 3.50, category: 'Beverages', inStock: true, stock: 50, emoji: '☕' },
@@ -128,6 +120,22 @@ const QUICK_ADD_PRODUCTS = [
   { id: '56', name: 'Ice Cream', price: 4.00, emoji: '🍨' },
 ]
 
+const normalizeProduct = (product: any): Product => ({
+  id: product.id || product._id,
+  name: product.name,
+  price: Number(product.price) || 0,
+  category: product.category || product.categoryId || 'Uncategorized',
+  inStock: product.inStock ?? product.isActive ?? (Number(product.stock) > 0),
+  stock: Number(product.stock ?? product.quantity ?? 0),
+  emoji: product.emoji || '📦',
+  image: product.image || product.imageUrl,
+  description: product.description,
+  sku: product.sku,
+  barcode: product.barcode,
+  taxRate: product.taxRate,
+  costPrice: product.cost
+})
+
 const CATEGORIES = [
   { id: 'all', name: 'All Products', emoji: '📦' },
   { id: 'Beverages', name: 'Beverages', emoji: '☕' },
@@ -157,6 +165,9 @@ const POSTerminalPage: React.FC = () => {
   const [isOnline] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showAISuggestion, setShowAISuggestion] = useState(true)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [posMessage, setPosMessage] = useState<string | null>(null)
 
   // Load products from API
   const loadProducts = async () => {
@@ -164,9 +175,9 @@ const POSTerminalPage: React.FC = () => {
       const response = await productApi.getProducts()
       // Handle both direct array and wrapped response
       if (Array.isArray(response)) {
-        setProducts(response)
+        setProducts(response.map(normalizeProduct))
       } else if (response && Array.isArray(response.products)) {
-        setProducts(response.products)
+        setProducts(response.products.map(normalizeProduct))
       } else {
         console.warn('Invalid API response, using fallback products')
         setProducts(MOCK_PRODUCTS)
@@ -237,25 +248,34 @@ const POSTerminalPage: React.FC = () => {
     return matchesSearch && matchesCategory
   })
 
+  const findProductForShortcut = (shortcut: { id: string; name: string }) => {
+    return products.find((product: any) =>
+      product.id === shortcut.id ||
+      product.name.toLowerCase() === shortcut.name.toLowerCase()
+    )
+  }
+
   const addToCart = (product: Product) => {
-    console.log('addToCart called:', product.name, 'inStock:', product.inStock, 'stock:', product.stock)
+    const productId = product.id
+    if (!productId) {
+      setPosMessage(`Cannot add ${product.name}: missing product id.`)
+      return
+    }
     if (!product.inStock || (product.stock || 0) === 0) {
-      console.log('Product out of stock, not adding')
+      setPosMessage(`${product.name} is out of stock.`)
       return
     }
     
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product._id)
+      const existingItem = prevCart.find(item => item.id === productId)
       if (existingItem) {
-        console.log('Updating quantity for existing item')
         return prevCart.map(item =>
-          item.id === product._id
+          item.id === productId
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
       }
-      console.log('Adding new item to cart')
-      return [...prevCart, { id: product._id, product, quantity: 1, total: product.price }]
+      return [...prevCart, { id: productId, product, quantity: 1, total: product.price }]
     })
   }
 
@@ -309,30 +329,58 @@ const POSTerminalPage: React.FC = () => {
   }
 
   const processPayment = async (method: string) => {
+    if (cart.length === 0) return
     setIsProcessing(true)
     setSelectedPaymentMethod(method)
-    
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    const transaction: Transaction = {
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 600))
+
+      const transaction: Transaction = {
+        id: Date.now().toString(),
+        items: [...cart],
+        subtotal: calculateSubtotal(),
+        tax: calculateTax(),
+        total: calculateTotal(),
+        paymentMethod: method,
+        timestamp: new Date().toLocaleString(),
+        status: 'completed'
+      }
+
+      const existingTransactions = JSON.parse(localStorage.getItem('pos-transactions') || '[]')
+      localStorage.setItem('pos-transactions', JSON.stringify([transaction, ...existingTransactions]))
+      setCurrentTransaction(transaction)
+      setShowPaymentModal(false)
+      setShowReceipt(true)
+      setCart([])
+      setDiscountPercent(0)
+      setShippingAmount(0)
+    } catch (error) {
+      console.error('Payment failed:', error)
+      setPosMessage('Payment failed. Please try again.')
+    } finally {
+      setIsProcessing(false)
+      setSelectedPaymentMethod(null)
+    }
+  }
+
+  const saveOrderSnapshot = (type: 'draft' | 'quote' | 'suspended') => {
+    if (cart.length === 0) return
+    const order = {
       id: Date.now().toString(),
-      items: [...cart],
+      type,
+      items: cart,
       subtotal: calculateSubtotal(),
       tax: calculateTax(),
       total: calculateTotal(),
-      paymentMethod: method,
-      timestamp: new Date().toLocaleString(),
-      status: 'completed'
+      customer: selectedCustomer,
+      createdAt: new Date().toISOString()
     }
-    
-    setCurrentTransaction(transaction)
-    setShowPaymentModal(false)
-    setShowReceipt(true)
-    setCart([])
-    setDiscountPercent(0)
-    setShippingAmount(0)
-    setIsProcessing(false)
-    setSelectedPaymentMethod(null)
+    const key = `pos-${type}-orders`
+    const existingOrders = JSON.parse(localStorage.getItem(key) || '[]')
+    localStorage.setItem(key, JSON.stringify([order, ...existingOrders]))
+    setPosMessage(`${type === 'draft' ? 'Draft' : type === 'quote' ? 'Quote' : 'Suspended order'} saved.`)
+    if (type === 'suspended') clearCart()
   }
 
   const getStockStatus = (stock: number) => {
@@ -391,7 +439,10 @@ const POSTerminalPage: React.FC = () => {
             </div>
             
             <div className="relative">
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
+              >
                 {notificationCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
                     {notificationCount}
@@ -399,6 +450,13 @@ const POSTerminalPage: React.FC = () => {
                 )}
                 <Bell size={20} className="text-gray-600" />
               </button>
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-xl z-20">
+                  <p className="font-semibold text-gray-800 mb-2">Notifications</p>
+                  <p className="text-sm text-gray-600">3 low-stock products need attention.</p>
+                  <p className="text-sm text-gray-600">Last sync completed 1 minute ago.</p>
+                </div>
+              )}
             </div>
 
             <button 
@@ -416,6 +474,33 @@ const POSTerminalPage: React.FC = () => {
           <span className="flex items-center gap-1">⏰ {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       </div>
+
+      {posMessage && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <span>{posMessage}</span>
+          <button onClick={() => setPosMessage(null)} className="font-semibold hover:text-blue-950">Dismiss</button>
+        </div>
+      )}
+
+      {showShortcuts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowShortcuts(false)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Keyboard Shortcuts</h2>
+              <button onClick={() => setShowShortcuts(false)} className="p-2 rounded-lg hover:bg-gray-100">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600">
+              <div className="flex justify-between"><span>Open payment</span><strong>Ctrl + P</strong></div>
+              <div className="flex justify-between"><span>Clear cart</span><strong>Ctrl + C</strong></div>
+              <div className="flex justify-between"><span>Focus search</span><strong>Ctrl + F</strong></div>
+              <div className="flex justify-between"><span>Close modals</span><strong>Esc</strong></div>
+              <div className="flex justify-between"><span>Maximize</span><strong>M</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Customer Context Row */}
       <div className="bg-white rounded-xl shadow-lg p-3 mb-3 flex flex-wrap items-center gap-3">
@@ -477,13 +562,28 @@ const POSTerminalPage: React.FC = () => {
             className="w-full pl-10 pr-32 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none shadow-sm text-base"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Voice search">
+            <button
+              onClick={() => {
+                document.getElementById('product-search')?.focus()
+                setPosMessage('Voice search is ready for microphone integration. Type to search for now.')
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voice search"
+            >
               <Mic size={18} className="text-gray-500" />
             </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Scan product">
+            <button
+              onClick={() => setPosMessage('Scanner is ready for camera integration. Use search or product grid for now.')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Scan product"
+            >
               <Camera size={18} className="text-gray-500" />
             </button>
-            <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors" title="Keyboard shortcuts">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              title="Keyboard shortcuts"
+            >
               <Keyboard size={18} className="text-gray-600" />
             </button>
           </div>
@@ -521,7 +621,7 @@ const POSTerminalPage: React.FC = () => {
                 <button 
                   key={product.id}
                   onClick={() => {
-                    const fullProduct = products.find((p: any) => p.id === product.id)
+                    const fullProduct = findProductForShortcut(product)
                     if (fullProduct) addToCart(fullProduct)
                   }}
                   className="w-full bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-transparent rounded-lg p-2.5 text-left transition-all group"
@@ -562,12 +662,11 @@ const POSTerminalPage: React.FC = () => {
                 
                 return (
                   <motion.div 
-                    key={product._id || product.id}
+                    key={product.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.03 }}
                     onClick={() => {
-                      console.log('Card clicked:', product.name)
                       addToCart(product)
                     }}
                     className={`bg-gray-50 rounded-lg p-2.5 cursor-pointer transition-all group relative overflow-hidden border border-transparent hover:border-blue-200 ${
@@ -716,7 +815,7 @@ const POSTerminalPage: React.FC = () => {
                   <div className="flex gap-1">
                     <button 
                       onClick={() => {
-                        const latte = products.find((p: any) => p.id === '5')
+                        const latte = products.find((p: any) => p.name.toLowerCase() === 'latte')
                         if (latte) addToCart(latte)
                       }}
                       className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full font-medium hover:bg-purple-700 transition-colors"
@@ -780,7 +879,10 @@ const POSTerminalPage: React.FC = () => {
                 {/* Payment Methods */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <button 
-                    onClick={() => setShowPaymentModal(true)}
+                    onClick={() => {
+                      setSelectedPaymentMethod('cash')
+                      setShowPaymentModal(true)
+                    }}
                     disabled={cart.length === 0}
                     className="bg-green-600 text-white py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -788,7 +890,10 @@ const POSTerminalPage: React.FC = () => {
                     Cash
                   </button>
                   <button 
-                    onClick={() => setShowPaymentModal(true)}
+                    onClick={() => {
+                      setSelectedPaymentMethod('credit')
+                      setShowPaymentModal(true)
+                    }}
                     disabled={cart.length === 0}
                     className="bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -796,7 +901,10 @@ const POSTerminalPage: React.FC = () => {
                     Card
                   </button>
                   <button 
-                    onClick={() => setShowPaymentModal(true)}
+                    onClick={() => {
+                      setSelectedPaymentMethod('mobile')
+                      setShowPaymentModal(true)
+                    }}
                     disabled={cart.length === 0}
                     className="bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -804,7 +912,10 @@ const POSTerminalPage: React.FC = () => {
                     Mobile
                   </button>
                   <button 
-                    onClick={() => setShowPaymentModal(true)}
+                    onClick={() => {
+                      setSelectedPaymentMethod('split')
+                      setShowPaymentModal(true)
+                    }}
                     disabled={cart.length === 0}
                     className="bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -815,13 +926,22 @@ const POSTerminalPage: React.FC = () => {
                 
                 {/* Action Bar */}
                 <div className="flex items-center gap-2">
-                  <button className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors">
+                  <button
+                    onClick={() => saveOrderSnapshot('draft')}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
+                  >
                     Draft
                   </button>
-                  <button className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors">
+                  <button
+                    onClick={() => saveOrderSnapshot('quote')}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
+                  >
                     Quote
                   </button>
-                  <button className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors">
+                  <button
+                    onClick={() => saveOrderSnapshot('suspended')}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
+                  >
                     Suspend
                   </button>
                   <button 
@@ -894,6 +1014,7 @@ const POSTerminalPage: React.FC = () => {
                   { id: 'credit', name: 'Credit Card', icon: CreditCard, color: 'from-blue-500 to-blue-600' },
                   { id: 'debit', name: 'Debit Card', icon: CreditCard, color: 'from-indigo-500 to-indigo-600' },
                   { id: 'mobile', name: 'Mobile Pay', icon: Smartphone, color: 'from-purple-500 to-purple-600' },
+                  { id: 'split', name: 'Split Pay', icon: RefreshCw, color: 'from-orange-500 to-orange-600' },
                 ].map((method: any) => {
                   const Icon = method.icon
                   return (
@@ -903,7 +1024,7 @@ const POSTerminalPage: React.FC = () => {
                       disabled={isProcessing}
                       className={`relative overflow-hidden p-4 rounded-xl flex flex-col items-center gap-2 transition-all hover:scale-[1.02] ${
                         isProcessing ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
+                      } ${selectedPaymentMethod === method.id ? 'ring-4 ring-blue-200' : ''}`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${method.color}`} />
                       <div className="relative z-10 flex flex-col items-center text-white">

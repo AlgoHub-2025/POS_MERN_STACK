@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import {
-    Settings,
     Building2,
     Palette,
     Bell,
@@ -11,7 +10,6 @@ import {
     Sun,
     Moon,
     Monitor,
-    Globe,
     Mail,
     Smartphone,
     Cloud,
@@ -47,7 +45,10 @@ const tabs: TabConfig[] = [
 export const SettingsPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabId>('business')
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+    const [accentColor, setAccentColor] = useState('Blue')
     const [saved, setSaved] = useState(false)
+    const logoInputRef = useRef<HTMLInputElement>(null)
+    const importInputRef = useRef<HTMLInputElement>(null)
     const [businessInfo, setBusinessInfo] = useState({
         name: 'AlgoHub Coffee',
         email: 'contact@algohubcoffee.com',
@@ -74,8 +75,55 @@ export const SettingsPage: React.FC = () => {
     })
 
     const handleSave = () => {
+        localStorage.setItem('algohub-settings', JSON.stringify({ businessInfo, notifications, theme, accentColor }))
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
+    }
+
+    const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+        setBusinessInfo({ ...businessInfo, name: businessInfo.name })
+        window.alert(`Logo selected: ${file.name}`)
+        event.target.value = ''
+    }
+
+    const handleCreateBackup = () => {
+        const backup = JSON.stringify({ businessInfo, notifications, theme, accentColor, createdAt: new Date().toISOString() }, null, 2)
+        const url = URL.createObjectURL(new Blob([backup], { type: 'application/json' }))
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `algohub-settings-backup-${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+        URL.revokeObjectURL(url)
+    }
+
+    const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+        try {
+            const imported = JSON.parse(await file.text())
+            if (imported.businessInfo) setBusinessInfo(imported.businessInfo)
+            if (imported.notifications) setNotifications(imported.notifications)
+            if (imported.theme) setTheme(imported.theme)
+            if (imported.accentColor) setAccentColor(imported.accentColor)
+            setSaved(true)
+            setTimeout(() => setSaved(false), 2000)
+        } catch {
+            window.alert('Import failed. Please choose a valid settings backup JSON file.')
+        } finally {
+            event.target.value = ''
+        }
+    }
+
+    const handleRestoreBackup = () => {
+        if (window.confirm('Restore settings from a backup file? Current unsaved changes may be replaced.')) {
+            importInputRef.current?.click()
+        }
+    }
+
+    const handleIntegrationAction = (name: string, connected: boolean) => {
+        window.alert(`${connected ? 'Configure' : 'Connect'} ${name} is ready for backend integration.`)
     }
 
     const integrations = [
@@ -95,6 +143,8 @@ export const SettingsPage: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-400">Manage your store configuration and preferences</p>
                 </div>
                 <div className="flex items-center space-x-3">
+                    <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                    <input ref={importInputRef} type="file" accept="application/json,.json" onChange={handleImportData} className="hidden" />
                     <button onClick={() => window.location.reload()} className="btn-secondary">
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Reset
@@ -160,7 +210,10 @@ export const SettingsPage: React.FC = () => {
                                             <label className="form-label">Business Name</label>
                                             <input className="input" value={businessInfo.name} onChange={(e) => setBusinessInfo({ ...businessInfo, name: e.target.value })} />
                                         </div>
-                                        <button className="btn-secondary btn-sm">
+                                        <button
+                                            onClick={() => logoInputRef.current?.click()}
+                                            className="btn-secondary btn-sm"
+                                        >
                                             <Upload className="w-4 h-4 mr-2" />
                                             Upload Logo
                                         </button>
@@ -270,7 +323,8 @@ export const SettingsPage: React.FC = () => {
                                     ].map((accent) => (
                                         <button
                                             key={accent.name}
-                                            className={`w-10 h-10 ${accent.color} rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg ring-offset-2 ring-offset-white dark:ring-offset-gray-800 ${accent.name === 'Blue' ? `ring-2 ${accent.ring}` : ''}`}
+                                            onClick={() => setAccentColor(accent.name)}
+                                            className={`w-10 h-10 ${accent.color} rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg ring-offset-2 ring-offset-white dark:ring-offset-gray-800 ${accentColor === accent.name ? `ring-2 ${accent.ring}` : ''}`}
                                             title={accent.name}
                                         />
                                     ))}
@@ -376,7 +430,10 @@ export const SettingsPage: React.FC = () => {
                                                         <XCircle className="w-3 h-3 mr-1" />Disconnected
                                                     </span>
                                                 )}
-                                                <button className={`btn-sm ${integration.connected ? 'btn-secondary' : 'btn-primary'}`}>
+                                                <button
+                                                    onClick={() => handleIntegrationAction(integration.name, integration.connected)}
+                                                    className={`btn-sm ${integration.connected ? 'btn-secondary' : 'btn-primary'}`}
+                                                >
                                                     {integration.connected ? 'Configure' : 'Connect'}
                                                 </button>
                                             </div>
@@ -414,15 +471,15 @@ export const SettingsPage: React.FC = () => {
                             <div className="card p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Data Management</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <button className="btn-success w-full py-4">
+                                    <button onClick={handleCreateBackup} className="btn-success w-full py-4">
                                         <Database className="w-5 h-5 mr-2" />
                                         Create Backup
                                     </button>
-                                    <button className="btn-secondary w-full py-4">
+                                    <button onClick={() => importInputRef.current?.click()} className="btn-secondary w-full py-4">
                                         <Upload className="w-5 h-5 mr-2" />
                                         Import Data
                                     </button>
-                                    <button className="btn-warning w-full py-4">
+                                    <button onClick={handleRestoreBackup} className="btn-warning w-full py-4">
                                         <RotateCcw className="w-5 h-5 mr-2" />
                                         Restore Backup
                                     </button>

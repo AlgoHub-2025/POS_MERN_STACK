@@ -5,9 +5,6 @@ import {
   Edit, 
   Trash2, 
   Filter,
-  Brain,
-  TrendingUp,
-  TrendingDown,
   Package,
   AlertTriangle,
   Eye,
@@ -19,7 +16,7 @@ import {
   Save,
   X
 } from 'lucide-react'
-import { productApi, Product, ProductFilters } from '@/services/productService'
+import { productApi, Product } from '@/services/productService'
 
 interface AIInsight {
   title: string
@@ -37,9 +34,9 @@ const ProductsPage: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
-  const [analytics, setAnalytics] = useState<any>(null)
 
   // Load products from API
   const loadProducts = async () => {
@@ -121,12 +118,10 @@ const ProductsPage: React.FC = () => {
   // Load analytics data
   const loadAnalytics = async () => {
     try {
-      const analyticsData = await productApi.getProductAnalytics()
-      setAnalytics(analyticsData)
+      await productApi.getProductAnalytics()
     } catch (error) {
       console.error('Failed to load analytics:', error)
-      // Don't set analytics on error - it's optional
-      setAnalytics(null)
+      // Analytics are optional for this page.
     }
   }
 
@@ -191,25 +186,28 @@ const ProductsPage: React.FC = () => {
     }
   }
 
-  // Handle stock update
-  const handleStockUpdate = async (productId: string, newStock: number) => {
-    try {
-      await productApi.updateStock(productId, newStock)
-      await loadProducts() // Reload products
-    } catch (error) {
-      console.error('Failed to update stock:', error)
-    }
-  }
-
   // Handle export
   const handleExport = async () => {
-    try {
-      await productApi.exportProducts({
-        category: selectedCategory !== 'all' ? selectedCategory : undefined
-      })
-    } catch (error) {
-      console.error('Failed to export products:', error)
-    }
+    const rows = [
+      ['Name', 'SKU', 'Category', 'Price', 'Stock', 'Min Stock', 'Status', 'Description'],
+      ...filteredProducts.map(product => [
+        product.name,
+        product.sku,
+        product.category,
+        product.price.toFixed(2),
+        product.stock,
+        product.minStock,
+        product.status,
+        product.description
+      ])
+    ]
+    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   // Handle import
@@ -218,10 +216,33 @@ const ProductsPage: React.FC = () => {
     if (!file) return
     
     try {
-      await productApi.importProducts(file)
-      await loadProducts() // Reload products
+      const text = await file.text()
+      const [, ...lines] = text.split(/\r?\n/).filter(Boolean)
+      const importedProducts = lines.map((line, index) => {
+        const [name, sku, category, price, stock, minStock, status, description] = line
+          .split(',')
+          .map(value => value.replace(/^"|"$/g, '').replace(/""/g, '"'))
+        return {
+          _id: `import-${Date.now()}-${index}`,
+          name,
+          sku,
+          category,
+          price: Number(price) || 0,
+          stock: Number(stock) || 0,
+          minStock: Number(minStock) || 0,
+          status: (status || 'active') as Product['status'],
+          description: description || '',
+          lastUpdated: new Date().toISOString(),
+          inStock: Number(stock) > 0
+        }
+      }).filter(product => product.name && product.sku)
+      setProducts(prev => [...importedProducts, ...prev])
+      setFilteredProducts(prev => [...importedProducts, ...prev])
+      setCategories(prev => [...new Set([...prev, ...importedProducts.map(product => product.category)])])
     } catch (error) {
       console.error('Failed to import products:', error)
+    } finally {
+      event.target.value = ''
     }
   }
 
@@ -463,7 +484,10 @@ const ProductsPage: React.FC = () => {
                       <td>
                         <div className="flex items-center space-x-2">
                           <button 
-                            onClick={() => setSelectedProduct(product)}
+                            onClick={() => {
+                              setSelectedProduct(product)
+                              setShowDetailsModal(true)
+                            }}
                             className="btn-ghost btn-sm hover:scale-110 transition-transform duration-200"
                             title="View details"
                           >
@@ -553,6 +577,35 @@ const ProductsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Product Modal */}
+      {showDetailsModal && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Product Details</h2>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false)
+                  setSelectedProduct(null)
+                }}
+                className="btn-ghost"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between"><span>Name</span><strong>{selectedProduct.name}</strong></div>
+              <div className="flex justify-between"><span>SKU</span><strong>{selectedProduct.sku}</strong></div>
+              <div className="flex justify-between"><span>Category</span><strong>{selectedProduct.category}</strong></div>
+              <div className="flex justify-between"><span>Price</span><strong>${selectedProduct.price.toFixed(2)}</strong></div>
+              <div className="flex justify-between"><span>Stock</span><strong>{selectedProduct.stock}</strong></div>
+              <div className="flex justify-between"><span>Status</span><strong>{selectedProduct.status}</strong></div>
+              <p className="text-gray-600">{selectedProduct.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Product Modal */}
       {showAddModal && (

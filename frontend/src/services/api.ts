@@ -2,7 +2,7 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosE
 import toast from 'react-hot-toast'
 
 // API configuration
-const API_BASE_URL = 'http://localhost:3001/api'
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api'
 
 // Create axios instance
 export const api: AxiosInstance = axios.create({

@@ -3,21 +3,17 @@ import {
     ShoppingCart,
     Search,
     Download,
-    Filter,
     DollarSign,
     TrendingUp,
-    TrendingDown,
     Clock,
     Receipt,
     Eye,
-    MoreVertical,
     CreditCard,
     Banknote,
     Smartphone,
     CheckCircle,
     XCircle,
     AlertCircle,
-    Calendar,
     ArrowUpRight,
     ArrowDownRight
 } from 'lucide-react'
@@ -42,6 +38,7 @@ export const SalesPage: React.FC = () => {
     const [sales, setSales] = useState<SaleTransaction[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [selectedPeriod, setSelectedPeriod] = useState('today')
+    const [selectedSale, setSelectedSale] = useState<SaleTransaction | null>(null)
 
     useEffect(() => {
         const mockSales: SaleTransaction[] = [
@@ -60,7 +57,14 @@ export const SalesPage: React.FC = () => {
         }, 600)
     }, [])
 
-    const filteredSales = sales.filter(sale => {
+    const periodSales = sales.filter(sale => {
+        if (selectedPeriod === 'today') return sale.date === '2026-02-20'
+        if (selectedPeriod === 'week') return true
+        if (selectedPeriod === 'month') return true
+        return true
+    })
+
+    const filteredSales = periodSales.filter(sale => {
         const matchesSearch = sale.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
             sale.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesStatus = statusFilter === 'all' || sale.status === statusFilter
@@ -68,10 +72,34 @@ export const SalesPage: React.FC = () => {
         return matchesSearch && matchesStatus && matchesPayment
     })
 
-    const totalRevenue = sales.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0)
-    const totalOrders = sales.filter(s => s.status === 'completed').length
+    const totalRevenue = periodSales.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0)
+    const totalOrders = periodSales.filter(s => s.status === 'completed').length
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-    const refundAmount = sales.filter(s => s.status === 'refunded').reduce((sum, s) => sum + s.total, 0)
+    const refundAmount = periodSales.filter(s => s.status === 'refunded').reduce((sum, s) => sum + s.total, 0)
+
+    const handleExport = () => {
+        const rows = [
+            ['Order', 'Customer', 'Items', 'Total', 'Payment', 'Status', 'Cashier', 'Date', 'Time'],
+            ...filteredSales.map(sale => [
+                sale.orderNumber,
+                sale.customer,
+                sale.items,
+                sale.total.toFixed(2),
+                sale.paymentMethod,
+                sale.status,
+                sale.cashier,
+                sale.date,
+                sale.time
+            ])
+        ]
+        const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n')
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `sales_${selectedPeriod}.csv`
+        link.click()
+        URL.revokeObjectURL(url)
+    }
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -136,7 +164,7 @@ export const SalesPage: React.FC = () => {
                             </button>
                         ))}
                     </div>
-                    <button className="btn-primary">
+                    <button onClick={handleExport} className="btn-primary">
                         <Download className="w-4 h-4 mr-2" />
                         Export
                     </button>
@@ -227,7 +255,7 @@ export const SalesPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredSales.map((sale, index) => (
+                                {filteredSales.map((sale) => (
                                     <tr key={sale.id} className="hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors duration-200">
                                         <td className="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">{sale.orderNumber}</td>
                                         <td>
@@ -255,7 +283,10 @@ export const SalesPage: React.FC = () => {
                                         <td className="text-gray-600 dark:text-gray-400 text-sm">{sale.cashier}</td>
                                         <td className="text-gray-500 text-sm">{sale.time}</td>
                                         <td>
-                                            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                            <button
+                                                onClick={() => setSelectedSale(sale)}
+                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                            >
                                                 <Eye className="w-4 h-4 text-gray-400" />
                                             </button>
                                         </td>
@@ -288,6 +319,25 @@ export const SalesPage: React.FC = () => {
                     </div>
                 ))}
             </div>
+
+            {selectedSale && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setSelectedSale(null)}>
+                    <div className="card w-full max-w-md p-6" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Transaction Details</h2>
+                            <button onClick={() => setSelectedSale(null)} className="btn-ghost btn-sm">Close</button>
+                        </div>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between"><span>Order</span><strong>{selectedSale.orderNumber}</strong></div>
+                            <div className="flex justify-between"><span>Customer</span><strong>{selectedSale.customer}</strong></div>
+                            <div className="flex justify-between"><span>Total</span><strong>${selectedSale.total.toFixed(2)}</strong></div>
+                            <div className="flex justify-between"><span>Payment</span><strong className="capitalize">{selectedSale.paymentMethod}</strong></div>
+                            <div className="flex justify-between"><span>Status</span><strong className="capitalize">{selectedSale.status}</strong></div>
+                            <div className="flex justify-between"><span>Cashier</span><strong>{selectedSale.cashier}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

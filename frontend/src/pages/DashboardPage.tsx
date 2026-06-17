@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp,
   TrendingDown,
@@ -42,6 +43,9 @@ interface AIInsight {
 }
 
 const DashboardPage: React.FC = () => {
+  const navigate = useNavigate()
+  const [dateRange, setDateRange] = React.useState('30')
+
   const metrics: MetricCard[] = [
     {
       title: 'Total Revenue',
@@ -100,6 +104,30 @@ const DashboardPage: React.FC = () => {
     }
   ]
 
+  const handleExport = () => {
+    const rows = [
+      ['Metric', 'Value', 'Change'],
+      ...metrics.map(metric => [metric.title, metric.value, `${metric.changeType === 'increase' ? '+' : ''}${metric.change}%`]),
+      [],
+      ['Recent Transactions'],
+      ['ID', 'Customer', 'Amount', 'Status', 'Time'],
+      ...transactions.map(transaction => [
+        transaction.id,
+        transaction.customer,
+        transaction.amount,
+        transaction.status,
+        transaction.time
+      ])
+    ]
+    const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dashboard_last_${dateRange}_days.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Welcome Banner */}
@@ -117,11 +145,17 @@ const DashboardPage: React.FC = () => {
             </p>
           </div>
           <div className="hidden md:flex items-center space-x-3">
-            <button className="px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 border border-white/20">
+            <button
+              onClick={() => setDateRange(dateRange === '30' ? '7' : dateRange === '7' ? '90' : '30')}
+              className="px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 border border-white/20"
+            >
               <Calendar className="w-4 h-4 mr-2 inline" />
-              Last 30 Days
+              Last {dateRange} Days
             </button>
-            <button className="px-5 py-2.5 bg-white text-primary-700 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl">
+            <button
+              onClick={handleExport}
+              className="px-5 py-2.5 bg-white text-primary-700 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
+            >
               <FileDown className="w-4 h-4 mr-2 inline" />
               Export
             </button>
@@ -244,7 +278,10 @@ const DashboardPage: React.FC = () => {
                   <p className="text-sm font-medium text-warning-600">
                     {item.stock} left
                   </p>
-                  <button className="btn-warning btn-sm mt-1 hover:scale-105 transition-transform duration-200">
+                  <button
+                    onClick={() => navigate(`/products?reorder=${encodeURIComponent(item.sku)}`)}
+                    className="btn-warning btn-sm mt-1 hover:scale-105 transition-transform duration-200"
+                  >
                     Reorder
                   </button>
                 </div>

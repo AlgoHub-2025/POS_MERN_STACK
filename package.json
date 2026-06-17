@@ -1,6 +1,37 @@
 {
   "dependencies": {
+    "concurrently": "^10.0.3",
     "framer-motion": "^12.34.0",
     "react-confetti": "^6.4.0"
-  }
+  },
+  "name": "pos_mern_stack",
+  "version": "1.0.0",
+  "description": "This project is a complete migration of the AlgoHub POS system from NestJS/PostgreSQL to a modern MERN stack (MongoDB, Express.js, React, Node.js).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "devDependencies": {},
+  "scripts": {
+      "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "concurrently \"npm run build:backend\" \"npm run build:frontend\"",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlgoHub-2025/POS_MERN_STACK.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/AlgoHub-2025/POS_MERN_STACK/issues"
+  },
+  "homepage": "https://github.com/AlgoHub-2025/POS_MERN_STACK#readme"
 }

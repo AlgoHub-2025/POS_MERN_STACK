@@ -37,6 +37,10 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       }
 
       // Add user info to request
+
+      if (!user.role) {
+        return res.status(403).json({ message: 'User role is not defined' })
+      }
       req.user = {
         userId: user._id.toString(),
         email: user.email,

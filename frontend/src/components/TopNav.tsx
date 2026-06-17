@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Sun, Moon, Menu, Bell, LogOut, User, Settings, Search } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store'
@@ -19,6 +20,7 @@ const TopNav: React.FC<TopNavProps> = ({
   user, 
   theme 
 }) => {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -45,8 +47,10 @@ const TopNav: React.FC<TopNavProps> = ({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Implement search functionality
-    console.log('Searching for:', searchQuery)
+    const query = searchQuery.trim()
+    if (!query) return
+    navigate(`/products?search=${encodeURIComponent(query)}`)
+    setSearchQuery('')
   }
 
   const getThemeIcon = () => {
@@ -156,7 +160,13 @@ const TopNav: React.FC<TopNavProps> = ({
                   </div>
                   {notifications.length > 0 && (
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-                      <button className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                      <button
+                        onClick={() => {
+                          setShowNotifications(false)
+                          navigate('/notifications')
+                        }}
+                        className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                      >
                         View all notifications
                       </button>
                     </div>
@@ -194,11 +204,23 @@ const TopNav: React.FC<TopNavProps> = ({
                     </p>
                   </div>
                   <div className="py-1">
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        navigate('/profile')
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
                       <User className="mr-3 h-4 w-4" />
                       Profile
                     </button>
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        navigate('/settings')
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
                       <Settings className="mr-3 h-4 w-4" />
                       Settings
                     </button>

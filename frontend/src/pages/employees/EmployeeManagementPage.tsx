@@ -2,26 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { 
   Users, 
   Search, 
-  Filter, 
   Plus, 
   Edit, 
-  Trash2, 
   Calendar,
   Clock,
   TrendingUp,
   TrendingDown,
-  Award,
   DollarSign,
-  Mail,
-  Phone,
-  MapPin,
-  Eye,
   Download,
   BarChart3,
   Target,
-  Star,
-  Briefcase,
-  Coffee
 } from 'lucide-react'
 
 interface Employee {
@@ -75,6 +65,7 @@ export const EmployeeManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'employees' | 'schedule' | 'performance'>('employees')
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
 
   useEffect(() => {
     // Simulate API call to fetch employee data
@@ -253,14 +244,88 @@ export const EmployeeManagementPage: React.FC = () => {
     )
   }
 
+  const handleAddEmployee = () => {
+    const name = window.prompt('Employee name')
+    if (!name?.trim()) return
+    const [firstName, ...lastNameParts] = name.trim().split(' ')
+    const newEmployee: Employee = {
+      id: Date.now().toString(),
+      firstName,
+      lastName: lastNameParts.join(' ') || 'Employee',
+      email: `${firstName.toLowerCase()}@algohub.com`,
+      phone: '',
+      position: 'New Hire',
+      department: 'Operations',
+      hireDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      hourlyRate: 15,
+      monthlyHours: 0,
+      totalSales: 0,
+      ordersProcessed: 0,
+      averageOrderValue: 0,
+      performanceScore: 0,
+      attendanceRate: 100,
+      nextShift: 'Not scheduled'
+    }
+    setEmployees(prev => [newEmployee, ...prev])
+    setActionMessage(`Added ${newEmployee.firstName} ${newEmployee.lastName}`)
+  }
+
+  const handleExportEmployees = () => {
+    const rows = [
+      ['Name', 'Email', 'Phone', 'Position', 'Department', 'Status', 'Hourly Rate', 'Performance', 'Attendance'],
+      ...filteredEmployees.map(employee => [
+        `${employee.firstName} ${employee.lastName}`,
+        employee.email,
+        employee.phone,
+        employee.position,
+        employee.department,
+        employee.status,
+        employee.hourlyRate,
+        employee.performanceScore,
+        employee.attendanceRate
+      ])
+    ]
+    const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'employees.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleScheduleShift = (employeeId: string) => {
-    console.log('Scheduling shift for employee:', employeeId)
-    // Implement shift scheduling
+    const employee = employees.find(emp => emp.id === employeeId)
+    if (!employee) return
+    setActiveTab('schedule')
+    setActionMessage(`Scheduling view opened for ${employee.firstName} ${employee.lastName}`)
   }
 
   const handleViewPerformance = (employeeId: string) => {
-    console.log('Viewing performance for employee:', employeeId)
-    // Implement detailed performance view
+    const employee = employees.find(emp => emp.id === employeeId)
+    if (!employee) return
+    setActiveTab('performance')
+    setActionMessage(`Showing performance metrics for ${employee.firstName} ${employee.lastName}`)
+  }
+
+  const handleEditEmployee = (employeeId: string) => {
+    const employee = employees.find(emp => emp.id === employeeId)
+    if (!employee) return
+    const position = window.prompt('Position', employee.position)
+    if (!position?.trim()) return
+    setEmployees(prev => prev.map(emp => emp.id === employeeId ? { ...emp, position: position.trim() } : emp))
+    setActionMessage(`Updated ${employee.firstName} ${employee.lastName}`)
+  }
+
+  const handleEditShift = (shiftId: string) => {
+    const shift = shifts.find(item => item.id === shiftId)
+    if (!shift) return
+    const startTime = window.prompt('Start time', shift.startTime)
+    const endTime = window.prompt('End time', shift.endTime)
+    if (!startTime?.trim() || !endTime?.trim()) return
+    setShifts(prev => prev.map(item => item.id === shiftId ? { ...item, startTime: startTime.trim(), endTime: endTime.trim() } : item))
+    setActionMessage(`Updated shift for ${shift.employeeName}`)
   }
 
   if (isLoading) {
@@ -280,6 +345,12 @@ export const EmployeeManagementPage: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-green-400 mb-2">Employee Management</h1>
         <p className="text-gray-400">Manage staff, schedules, and performance metrics</p>
+        {actionMessage && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-green-400/30 bg-green-900/40 px-4 py-3 text-sm text-green-300">
+            <span>{actionMessage}</span>
+            <button onClick={() => setActionMessage(null)} className="text-green-200 hover:text-white">Dismiss</button>
+          </div>
+        )}
       </div>
 
       {/* Tab Navigation */}
@@ -366,11 +437,17 @@ export const EmployeeManagementPage: React.FC = () => {
 
           {/* Actions */}
           <div className="flex space-x-2">
-            <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2">
+            <button
+              onClick={handleAddEmployee}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2"
+            >
               <Plus className="w-4 h-4" />
               <span>Add Employee</span>
             </button>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2">
+            <button
+              onClick={handleExportEmployees}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2"
+            >
               <Download className="w-4 h-4" />
               <span>Export</span>
             </button>
@@ -479,6 +556,7 @@ export const EmployeeManagementPage: React.FC = () => {
                   <Calendar className="w-4 h-4 text-gray-400" />
                 </button>
                 <button
+                  onClick={() => handleEditEmployee(employee.id)}
                   className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
                   title="Edit Employee"
                 >
@@ -527,7 +605,10 @@ export const EmployeeManagementPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200">
+                      <button
+                        onClick={() => handleEditShift(shift.id)}
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                      >
                         <Edit className="w-4 h-4 text-gray-400" />
                       </button>
                     </td>
