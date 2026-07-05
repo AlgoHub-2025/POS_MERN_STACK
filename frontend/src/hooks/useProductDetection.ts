@@ -19,7 +19,7 @@ interface UseProductDetectionReturn {
   // Detection control
   detect: (imageData: ImageData) => Promise<DetectionResult[]>
   startContinuousDetection: (imageData: ImageData) => void
-  stopContinuousDetection: void
+  stopContinuousDetection: () => void
   
   // Configuration
   updateConfig: (config: Partial<DetectionConfig>) => void

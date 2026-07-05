@@ -14,7 +14,7 @@ interface VoiceCommand {
 
 interface UseVoiceSearchOptions {
   onCommandDetected: (command: VoiceCommand) => void
-  onProductFound: (product: Product) => void
+  onProductFound?: (product: Product) => void
   onError?: (error: string) => void
 }
 
@@ -116,7 +116,7 @@ export const useVoiceSearch = ({ onCommandDetected, onProductFound, onError }: U
             confidence: 0.9
           },
           ...(quantity ? [{
-            type: 'quantity',
+            type: 'quantity' as const,
             value: quantity.toString(),
             confidence: 0.95
           }] : [])

@@ -66,11 +66,11 @@ export const VisionAnalyticsDashboard: React.FC<VisionAnalyticsDashboardProps> =
     { name: 'Failed', value: metrics.totalScans - metrics.successfulScans, color: '#ef4444' }
   ]
 
-  const renderMetricCard = (title: string, value: string | number, icon: React.ComponentType<any>, color: string, trend?: { value: number; direction: 'up' | 'down' | 'stable' }) => (
+  const renderMetricCard = (title: string, value: string | number, Icon: React.ComponentType<any>, color: string, trend?: { value: number; direction: 'up' | 'down' | 'stable' }) => (
     <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
       <div className="flex items-center justify-between mb-2">
         <div className={`p-2 rounded-lg ${color}`}>
-          <icon className="w-5 h-5 text-white" />
+          <Icon className="w-5 h-5 text-white" />
         </div>
         {trend && (
           <div className={`flex items-center space-x-1 text-xs ${

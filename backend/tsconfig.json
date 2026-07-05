@@ -31,12 +31,23 @@
     "emitDecoratorMetadata": true
   },
   "include": [
-    "src/**/*",
-    "../shared/types/**/*"
+    "src/index.ts",
+    "src/app.ts",
+    "src/config/**/*",
+    "src/controllers/productController.ts",
+    "src/controllers/productAnalyticsController.ts",
+    "src/middleware/errorHandler.ts",
+    "src/middleware/notFoundHandler.ts",
+    "src/models/Product.ts",
+    "src/routes/auth-simple.ts",
+    "src/routes/productRoutes.ts",
+    "src/types/**/*",
+    "src/utils/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
+    "src/services",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "concurrent": "^0.3.2",
     "concurrently": "^10.0.3",
     "framer-motion": "^12.34.0",
     "react-confetti": "^6.4.0"
@@ -11,9 +12,8 @@
   "directories": {
     "doc": "docs"
   },
-  "devDependencies": {},
   "scripts": {
-      "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",

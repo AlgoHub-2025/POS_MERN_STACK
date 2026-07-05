@@ -15,9 +15,12 @@ export class DatabaseConnection {
 
   public async connect(): Promise<void> {
     try {
-      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/algohub_pos';
+      const mongoUri = process.env.MONGODB_URI;
+      if (!mongoUri && process.env.NODE_ENV === 'production') {
+        throw new Error('MONGODB_URI is required in production');
+      }
       
-      await mongoose.connect(mongoUri, {
+      await mongoose.connect(mongoUri || 'mongodb://localhost:27017/algohub_pos', {
         maxPoolSize: 10,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,

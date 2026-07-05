@@ -199,7 +199,8 @@ class EdgeCaseHandler {
     result.edgeCaseType = 'packaging'
     
     // Reduce confidence for packaged items
-    const packagingPenalty = {
+    const packagingPenalty: Record<DetectionContext['packaging'], number> = {
+      'none': 0,
       'box': 0.1,
       'wrapper': 0.15,
       'bottle': 0.2,
@@ -269,7 +270,7 @@ class EdgeCaseHandler {
         result.recommendations.push('Cannot differentiate from similar products - manual selection required')
         
         // Provide alternatives
-        result.recommendations.push(`Similar products: ${product.similarProducts.map(p => p.name).join(', ')}`)
+        result.recommendations.push(`Similar products: ${product.similarProducts.map((p: any) => p.name).join(', ')}`)
       }
     }
 
@@ -360,7 +361,7 @@ class EdgeCaseHandler {
    */
   private generateAngleProfiles(product: any): any {
     // Generate confidence profiles for different angles
-    const profiles = {}
+    const profiles: Record<number, { confidence: number; features: any[] }> = {}
     for (let angle = 0; angle <= 90; angle += 15) {
       profiles[angle] = {
         confidence: Math.max(0.4, 1 - (angle / 90) * 0.5),
@@ -468,7 +469,11 @@ class EdgeCaseHandler {
     priority: 'high' | 'medium' | 'low'
   }> {
     const stats = this.getFeedbackStatistics()
-    const recommendations = []
+    const recommendations: Array<{
+      edgeCase: string
+      recommendation: string
+      priority: 'high' | 'medium'
+    }> = []
 
     for (const [edgeCase, data] of Object.entries(stats.edgeCaseBreakdown)) {
       if (data.successRate < 0.6 && data.total > 10) {

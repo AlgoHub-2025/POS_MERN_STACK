@@ -196,3 +196,54 @@ MIT License - see LICENSE file for details.
 ## 📞 Support
 
 For support and questions, please open an issue in the repository.
+## Production Deployment
+
+### Backend on Render
+
+Use `backend` as the Render root directory.
+
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- Runtime: Node.js 20+
+- Health check path: `/health`
+
+Required backend environment variables:
+
+```bash
+NODE_ENV=production
+PORT=10000
+MONGODB_URI=<mongodb-atlas-or-render-private-uri>
+JWT_SECRET=<strong-secret>
+JWT_REFRESH_SECRET=<strong-refresh-secret>
+CORS_ORIGINS=https://your-frontend.vercel.app
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+LOG_LEVEL=info
+```
+
+Optional service variables are listed in `backend/.env.example` for Redis, S3, email, queues, and uploads.
+
+Current backend blocker: `backend/src/app.ts` imports `./routes/auth-simple`, but that file does not exist. Because authentication is protected for this audit, the route wiring was not changed.
+
+### Frontend on Vercel
+
+Use `frontend` as the Vercel root directory.
+
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Framework preset: Vite
+
+Required frontend environment variables:
+
+```bash
+VITE_API_BASE_URL=https://your-render-service.onrender.com/api
+VITE_SOCKET_URL=https://your-render-service.onrender.com
+VITE_APP_NAME=AlgoHub POS
+VITE_APP_VERSION=1.0.0
+VITE_ENABLE_PWA=true
+VITE_ENABLE_DEBUG=false
+VITE_ENABLE_SOURCEMAPS=false
+```
+
+After deploying the frontend, add its Vercel URL to the backend `CORS_ORIGINS` value on Render.

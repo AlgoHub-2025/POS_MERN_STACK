@@ -410,7 +410,7 @@ class FrameProcessor {
     // Create texture from image data
     const texture = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, texture)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, imageData)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageData)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 
@@ -559,6 +559,13 @@ class FrameProcessor {
       droppedFrames: this.droppedFrames,
       fps: this.config.targetFPS
     }
+  }
+
+  /**
+   * Get current configuration
+   */
+  getConfig(): FrameProcessorConfig {
+    return { ...this.config }
   }
 
   /**

@@ -63,7 +63,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: process.env.VITE_ENABLE_SOURCEMAPS === 'true',
     rollupOptions: {
       output: {
         manualChunks: {

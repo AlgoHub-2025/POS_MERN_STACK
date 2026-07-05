@@ -4,8 +4,7 @@ import {
   X, 
   Smartphone, 
   Monitor,
-  Chrome,
-  Safari
+  Chrome
 } from 'lucide-react'
 import { usePWA } from '@/hooks/usePWA'
 
@@ -22,7 +21,7 @@ export const InstallPrompt: React.FC = () => {
     const userAgent = navigator.userAgent.toLowerCase()
     
     if (userAgent.includes('chrome')) return <Chrome className="w-5 h-5" />
-    if (userAgent.includes('safari')) return <Safari className="w-5 h-5" />
+    if (userAgent.includes('safari')) return <Smartphone className="w-5 h-5" />
     return <Monitor className="w-5 h-5" />
   }
 

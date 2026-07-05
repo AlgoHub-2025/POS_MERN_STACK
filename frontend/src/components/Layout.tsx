@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { Sun, Moon, LogOut } from 'lucide-react'
 
 import { RootState, AppDispatch } from '@/store'
-import { toggleSidebar, setTheme } from '@/store/slices/uiSlice'
+import { toggleSidebar, setSidebarOpen, setTheme } from '@/store/slices/uiSlice'
 import { logout } from '@/store/slices/authSlice'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
@@ -21,10 +21,9 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024)
-      if (window.innerWidth >= 1024) {
-        dispatch(toggleSidebar()) // Reset sidebar on desktop
-      }
+      const nextIsMobile = window.innerWidth < 1024
+      setIsMobile(nextIsMobile)
+      dispatch(setSidebarOpen(!nextIsMobile))
     }
 
     checkMobile()

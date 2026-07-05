@@ -322,7 +322,11 @@ class VisionAnalytics {
     message: string
     recommendation?: string
   }> {
-    const insights = []
+    const insights: Array<{
+      type: 'info' | 'success' | 'warning'
+      message: string
+      recommendation?: string
+    }> = []
     const accuracy = this.getOverallAccuracy()
 
     // Overall accuracy insights

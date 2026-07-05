@@ -1,7 +1,20 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { Product as IProduct } from '../../../shared/types';
 
-export interface ProductDocument extends IProduct, Document {
+export interface ProductDocument extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  categoryId?: mongoose.Types.ObjectId;
+  name: string;
+  description?: string;
+  sku: string;
+  barcode?: string;
+  unit: 'pcs' | 'kg' | 'liter' | 'meter' | 'box' | 'dozen';
+  cost: number;
+  price: number;
+  taxRate: number;
+  reorderLevel?: number;
+  reorderQuantity?: number;
+  imageUrl?: string;
+  isActive: boolean;
   isInStock(): boolean;
   isLowStock(): boolean;
   updateStock(quantity: number): Promise<ProductDocument>;
@@ -86,7 +99,7 @@ const productSchema = new Schema<ProductDocument>({
   timestamps: true,
   toJSON: {
     transform: function (doc, ret) {
-      delete ret.__v;
+      delete (ret as { __v?: unknown }).__v;
       return ret;
     }
   }
@@ -100,7 +113,7 @@ productSchema.index({ tenantId: 1, isActive: 1 });
 productSchema.index({ tenantId: 1, categoryId: 1 });
 
 // Virtual for profit margin
-productSchema.virtual('profitMargin').get(function () {
+productSchema.virtual('profitMargin').get(function (this: ProductDocument) {
   if (this.cost > 0) {
     return ((this.price - this.cost) / this.price) * 100;
   }
@@ -108,17 +121,17 @@ productSchema.virtual('profitMargin').get(function () {
 });
 
 // Virtual for price with tax
-productSchema.virtual('priceWithTax').get(function () {
+productSchema.virtual('priceWithTax').get(function (this: ProductDocument) {
   return this.price * (1 + this.taxRate / 100);
 });
 
 // Instance methods
-productSchema.methods.isInStock = function (): boolean {
+productSchema.methods.isInStock = function (this: ProductDocument): boolean {
   // This would typically check inventory, but for now we'll assume active products are in stock
   return this.isActive;
 };
 
-productSchema.methods.isLowStock = async function (): Promise<boolean> {
+productSchema.methods.isLowStock = async function (this: ProductDocument): Promise<boolean> {
   if (!this.reorderLevel) return false;
 
   // Assuming we use the Mongoose model to sum up the InventoryItem quantities
@@ -129,7 +142,7 @@ productSchema.methods.isLowStock = async function (): Promise<boolean> {
   return totalStock <= this.reorderLevel;
 };
 
-productSchema.methods.updateStock = async function (quantity: number): Promise<ProductDocument> {
+productSchema.methods.updateStock = async function (this: ProductDocument, quantity: number): Promise<ProductDocument> {
   // Creating a generic adjustment for now as a fallback since full movement logic requires 
   // warehouse context. We will just update a main inventory record if it exists.
   const InventoryItem = mongoose.model('InventoryItem');
@@ -176,13 +189,8 @@ productSchema.statics.findActiveByTenant = function (tenantId: string) {
 };
 
 // Query middleware
-productSchema.pre(/^find/, function (next) {
-  this.populate('category');
-  next();
-});
-
 // Pre-save middleware
-productSchema.pre('save', function (next) {
+productSchema.pre('save', function (this: ProductDocument, next) {
   if (this.isModified('sku')) {
     this.sku = this.sku.toUpperCase().trim();
   }

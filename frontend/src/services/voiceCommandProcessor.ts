@@ -1,4 +1,4 @@
-import { VoiceCommand } from './voiceRecognition'
+import type { VoiceCommand } from './voiceRecognition'
 import { Product } from '@/types'
 
 interface ProcessedCommand {
@@ -47,8 +47,6 @@ class VoiceCommandProcessor {
   }
 
   public processCommand(command: VoiceCommand): ProcessedCommand {
-    const startTime = Date.now()
-    
     try {
       // Step 1: Enhanced intent recognition with context awareness
       const intent = this.recognizeIntent(command)
@@ -57,13 +55,13 @@ class VoiceCommandProcessor {
       const entities = this.extractEntities(command)
       
       // Step 3: Action determination
-      const action = this.determineAction(intent, entities)
+      const action = this.determineAction(intent.name, entities)
       
       // Step 4: Generate response
-      const response = this.generateResponse(intent, entities, command.language)
+      const response = this.generateResponse(intent.name, entities, command.language)
       
       // Step 5: Generate suggestions
-      const suggestions = this.generateSuggestions(intent, entities)
+      const suggestions = this.generateSuggestions(intent.name, entities)
       
       // Step 6: Calculate confidence
       const confidence = this.calculateConfidence(command, intent, entities)
@@ -528,5 +526,6 @@ class VoiceCommandProcessor {
   }
 }
 
-export { VoiceCommandProcessor, ProcessedCommand, CommandHistory }
+export { VoiceCommandProcessor }
+export type { ProcessedCommand, CommandHistory }
 export default VoiceCommandProcessor

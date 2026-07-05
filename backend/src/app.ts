@@ -25,10 +25,11 @@ class App {
 
   constructor() {
     this.app = express();
+    const allowedOrigins = this.getAllowedOrigins();
     this.server = createServer(this.app);
     this.io = new SocketIOServer(this.server, {
       cors: {
-        origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+        origin: allowedOrigins,
         methods: ["GET", "POST"]
       }
     });
@@ -46,7 +47,7 @@ class App {
     
     // CORS configuration
     this.app.use(cors({
-      origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+      origin: this.getAllowedOrigins(),
       credentials: true
     }));
 
@@ -79,6 +80,21 @@ class App {
         database: database.isConnected() ? 'connected' : 'disconnected'
       });
     });
+  }
+
+  private getAllowedOrigins(): string[] | string {
+    const origins = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN;
+    if (!origins && process.env.NODE_ENV === 'production') {
+      return [];
+    }
+
+    const originConfig = origins || 'http://localhost:3000';
+    const parsed = originConfig
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+
+    return parsed.length > 1 ? parsed : parsed[0];
   }
 
   private initializeRoutes(): void {

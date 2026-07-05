@@ -2,10 +2,10 @@
   "name": "pos-mern-backend",
   "version": "1.0.0",
   "description": "AlgoHub POS Backend - MERN Stack Migration",
-  "main": "server.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
     "dev-ts": "nodemon src/app.ts",
     "build": "tsc",
     "test": "jest",

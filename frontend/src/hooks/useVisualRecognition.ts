@@ -65,7 +65,7 @@ export const useVisualRecognition = ({ onProductRecognized, onError }: UseVisual
 
   // Check if browser supports camera access
   useEffect(() => {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    if (navigator.mediaDevices) {
       setIsSupported(true)
     } else {
       onError?.('Camera access is not supported in this browser')
@@ -109,7 +109,7 @@ export const useVisualRecognition = ({ onProductRecognized, onError }: UseVisual
     const canvas = canvasRef.current
     const context = canvas?.getContext('2d')
 
-    if (!context || !video) return
+    if (!context) return
 
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth
@@ -136,7 +136,7 @@ export const useVisualRecognition = ({ onProductRecognized, onError }: UseVisual
     setIsScanning(false)
   }, [onProductRecognized])
 
-  const analyzeVisualFeatures = (imageData: ImageData): RecognizedProduct[] => {
+  const analyzeVisualFeatures = (_imageData: ImageData): RecognizedProduct[] => {
     // Simulate computer vision analysis
     // In a real implementation, this would use TensorFlow.js or similar ML library
     

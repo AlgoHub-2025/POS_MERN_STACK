@@ -22,7 +22,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       return
     }
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'
+    const socketUrl = ((import.meta as any).env?.VITE_SOCKET_URL as string | undefined) || window.location.origin
     
     socketRef.current = io(socketUrl, {
       auth: {

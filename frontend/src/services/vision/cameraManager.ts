@@ -65,7 +65,7 @@ class CameraManager {
       const constraints = this.buildConstraints(config, targetDevice.deviceId)
       
       // Request stream with retry logic
-      let stream: MediaStream
+      let stream: MediaStream | null = null
       let retryCount = 0
       const maxRetries = 3
 
@@ -95,6 +95,10 @@ class CameraManager {
           // Wait before retry
           await new Promise(resolve => setTimeout(resolve, 1000))
         }
+      }
+
+      if (!stream) {
+        throw new Error('Failed to initialize camera stream')
       }
 
       this.stream = stream
@@ -192,7 +196,7 @@ class CameraManager {
 
     // Add advanced constraints if supported
     if (config.torch) {
-      videoConstraints.torch = true
+      ;(videoConstraints as any).torch = true
     }
 
     return {
@@ -377,7 +381,7 @@ class CameraManager {
     this.stop()
 
     // Toggle facing mode
-    const newConfig = {
+    const newConfig: CameraConfig = {
       ...this.currentConfig,
       facingMode: this.currentConfig.facingMode === 'environment' ? 'user' : 'environment'
     }

@@ -1,5 +1,22 @@
 // Voice Recognition Service with Multi-language Support
 
+interface SpeechRecognition {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  maxAlternatives: number
+  onstart: (() => void) | null
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string
+}
+
 interface VoiceCommand {
   command: string
   intent: string
@@ -353,20 +370,21 @@ class VoiceRecognitionService {
   private initializeSpeechRecognition(): void {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      this.recognition = new SpeechRecognition()
+      const recognition = new SpeechRecognition()
+      this.recognition = recognition
       
-      this.recognition.continuous = false
-      this.recognition.interimResults = false
-      this.recognition.lang = this.getLanguageCode()
-      this.recognition.maxAlternatives = 3
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.lang = this.getLanguageCode()
+      recognition.maxAlternatives = 3
 
-      this.recognition.onstart = () => {
+      recognition.onstart = () => {
         this.isListening = true
         this.onStatusCallback?.('listening')
         this.speak(this.getRandomResponse('listening'))
       }
 
-      this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript.toLowerCase()
         const confidence = event.results[0][0].confidence
         
@@ -374,14 +392,14 @@ class VoiceRecognitionService {
         this.onCommandCallback?.(command)
       }
 
-      this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         this.isListening = false
         const errorMessage = this.getErrorMessage(event.error)
         this.onErrorCallback?.(errorMessage)
         this.speak(this.getRandomResponse('error'))
       }
 
-      this.recognition.onend = () => {
+      recognition.onend = () => {
         this.isListening = false
         this.onStatusCallback?.('idle')
       }
@@ -595,5 +613,6 @@ interface SpeechRecognitionAlternative {
   confidence: number
 }
 
-export { VoiceRecognitionService, VoiceCommand, LanguagePack }
+export { VoiceRecognitionService }
+export type { VoiceCommand, LanguagePack }
 export default VoiceRecognitionService

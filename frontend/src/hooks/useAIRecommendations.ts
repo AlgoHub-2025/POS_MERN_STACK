@@ -45,7 +45,7 @@ export const useAIRecommendations = (options: UseAIRecommendationsOptions) => {
 
   // Generate AI recommendations based on multiple factors
   const generateAIRecommendations = (params: UseAIRecommendationsOptions): AIRecommendation[] => {
-    const { products, cart, timeOfDay, customerHistory } = params
+    const { products, cart, timeOfDay, customerHistory = [] } = params
     
     // Factor 1: Time-based recommendations
     const timeBasedRecs = getTimeBasedRecommendations(products, timeOfDay)

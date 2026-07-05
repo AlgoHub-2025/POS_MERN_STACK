@@ -35,28 +35,23 @@ export const useNotifications = () => {
       setNotifications(prev => [newNotification, ...prev])
       setUnreadCount(prev => prev + 1)
 
+      const toastMessage = `${notification.title}: ${notification.message}`
+
       // Show toast notification
       switch (notification.type) {
         case 'success':
-          toast.success(notification.title, {
-            description: notification.message
-          })
+          toast.success(toastMessage)
           break
         case 'error':
-          toast.error(notification.title, {
-            description: notification.message
-          })
+          toast.error(toastMessage)
           break
         case 'warning':
-          toast(notification.title, {
+          toast(toastMessage, {
             icon: '⚠️',
-            description: notification.message
           })
           break
         default:
-          toast(notification.title, {
-            description: notification.message
-          })
+          toast(toastMessage)
       }
     }
 

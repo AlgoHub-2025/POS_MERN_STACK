@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: algohub-pos-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      - key: LOG_LEVEL
+        value: info
