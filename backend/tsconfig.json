@@ -10,45 +10,26 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "moduleResolution": "node",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "removeComments": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "noImplicitThis": true,
-    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@/types/*": ["../shared/types/*"]
-    },
     "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": [
     "src/index.ts",
-    "src/app.ts",
-    "src/config/**/*",
-    "src/controllers/productController.ts",
-    "src/controllers/productAnalyticsController.ts",
-    "src/middleware/errorHandler.ts",
-    "src/middleware/notFoundHandler.ts",
-    "src/models/Product.ts",
-    "src/routes/auth-simple.ts",
-    "src/routes/productRoutes.ts",
-    "src/types/**/*",
-    "src/utils/**/*"
+    "src/types/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src/services",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "dist"
   ]
 }

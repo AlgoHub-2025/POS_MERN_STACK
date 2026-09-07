@@ -3,6 +3,13 @@ import toast from 'react-hot-toast'
 
 // API configuration
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api'
+let accessToken: string | null = null
+let refreshToken: string | null = null
+
+export const setAuthTokens = (tokens: { accessToken: string; refreshToken: string } | null) => {
+  accessToken = tokens?.accessToken || null
+  refreshToken = tokens?.refreshToken || null
+}
 
 // Create axios instance
 export const api: AxiosInstance = axios.create({
@@ -22,18 +29,8 @@ interface ErrorResponse {
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const authData = localStorage.getItem('persist:root')
-    if (authData) {
-      try {
-        const parsedAuth = JSON.parse(authData)
-        const tokens = parsedAuth.auth ? JSON.parse(parsedAuth.auth).tokens : null
-        
-        if (tokens?.accessToken) {
-          config.headers.Authorization = `Bearer ${tokens.accessToken}`
-        }
-      } catch (error) {
-        console.error('Error parsing auth data:', error)
-      }
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`
     }
     
     return config
@@ -56,27 +53,14 @@ api.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        const authData = localStorage.getItem('persist:root')
-        if (authData) {
-          const parsedAuth = JSON.parse(authData)
-          const tokens = parsedAuth.auth ? JSON.parse(parsedAuth.auth).tokens : null
-          
-          if (tokens?.refreshToken) {
+          if (refreshToken) {
             // Attempt to refresh the token
             const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-              refreshToken: tokens.refreshToken,
+              refreshToken,
             })
 
             const { tokens: newTokens } = response.data
-            
-            // Update the stored tokens
-            if (parsedAuth.auth) {
-              parsedAuth.auth = JSON.stringify({
-                ...JSON.parse(parsedAuth.auth),
-                tokens: newTokens,
-              })
-              localStorage.setItem('persist:root', JSON.stringify(parsedAuth))
-            }
+            setAuthTokens(newTokens)
 
             // Retry the original request with the new token
             if (originalRequest.headers) {
@@ -85,10 +69,12 @@ api.interceptors.response.use(
             
             return api(originalRequest)
           }
-        }
       } catch (refreshError) {
         // Refresh failed, logout user
+        setAuthTokens(null)
         localStorage.removeItem('persist:root')
+        localStorage.removeItem('isAuthenticated')
+        localStorage.removeItem('user')
         window.location.href = '/login'
         return Promise.reject(refreshError)
       }

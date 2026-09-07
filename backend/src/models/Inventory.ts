@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IWarehouse extends Document {
+  tenantId: mongoose.Types.ObjectId;
   warehouseId: string;
   name: string;
   code: string;
@@ -84,6 +85,7 @@ export interface IWarehouse extends Document {
 }
 
 export interface IInventoryItem extends Document {
+  tenantId: mongoose.Types.ObjectId;
   itemId: string;
   productId: string;
   sku: string;
@@ -175,6 +177,7 @@ export interface IInventoryItem extends Document {
 }
 
 export interface IStockTransfer extends Document {
+  tenantId: mongoose.Types.ObjectId;
   transferId: string;
   fromWarehouseId: string;
   toWarehouseId: string;
@@ -236,6 +239,7 @@ export interface IStockTransfer extends Document {
 }
 
 export interface ICycleCount extends Document {
+  tenantId: mongoose.Types.ObjectId;
   countId: string;
   warehouseId: string;
   zoneId?: string;
@@ -288,6 +292,7 @@ export interface ICycleCount extends Document {
 }
 
 export interface IInventoryAdjustment extends Document {
+  tenantId: mongoose.Types.ObjectId;
   adjustmentId: string;
   warehouseId: string;
   adjustmentType: 'damage' | 'loss' | 'theft' | 'return' | 'correction' | 'expiry' | 'recall';
@@ -343,6 +348,7 @@ export interface IInventoryAdjustment extends Document {
 }
 
 export interface IReorderPoint extends Document {
+  tenantId: mongoose.Types.ObjectId;
   pointId: string;
   productId: string;
   sku: string;
@@ -396,9 +402,10 @@ export interface IReorderPoint extends Document {
 
 // Schemas
 const WarehouseSchema = new Schema<IWarehouse>({
-  warehouseId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  warehouseId: { type: String, required: true, index: true },
   name: { type: String, required: true },
-  code: { type: String, required: true, unique: true },
+  code: { type: String, required: true },
   type: { type: String, required: true, enum: ['main', 'branch', 'store', 'distribution_center', 'fulfillment_center'] },
   location: {
     address: { type: String, required: true },
@@ -477,11 +484,12 @@ const WarehouseSchema = new Schema<IWarehouse>({
 }, { timestamps: true });
 
 const InventoryItemSchema = new Schema<IInventoryItem>({
-  itemId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  itemId: { type: String, required: true, index: true },
   productId: { type: String, required: true, index: true },
   sku: { type: String, required: true, index: true },
-  barcode: { type: String, required: true, unique: true },
-  qrCode: { type: String, required: true, unique: true },
+  barcode: { type: String, required: true },
+  qrCode: { type: String, required: true },
   serialNumber: { type: String, sparse: true },
   batchNumber: { type: String, sparse: true },
   lotNumber: { type: String, sparse: true },
@@ -566,7 +574,8 @@ const InventoryItemSchema = new Schema<IInventoryItem>({
 }, { timestamps: true });
 
 const StockTransferSchema = new Schema<IStockTransfer>({
-  transferId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  transferId: { type: String, required: true, index: true },
   fromWarehouseId: { type: String, required: true, index: true },
   toWarehouseId: { type: String, required: true, index: true },
   status: { type: String, required: true, enum: ['pending', 'approved', 'in_transit', 'received', 'completed', 'cancelled'], default: 'pending' },
@@ -625,7 +634,8 @@ const StockTransferSchema = new Schema<IStockTransfer>({
 }, { timestamps: true });
 
 const CycleCountSchema = new Schema<ICycleCount>({
-  countId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  countId: { type: String, required: true, index: true },
   warehouseId: { type: String, required: true, index: true },
   zoneId: String,
   countType: { type: String, required: true, enum: ['full', 'partial', 'cycle', 'spot'] },
@@ -675,7 +685,8 @@ const CycleCountSchema = new Schema<ICycleCount>({
 }, { timestamps: true });
 
 const InventoryAdjustmentSchema = new Schema<IInventoryAdjustment>({
-  adjustmentId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  adjustmentId: { type: String, required: true, index: true },
   warehouseId: { type: String, required: true, index: true },
   adjustmentType: { type: String, required: true, enum: ['damage', 'loss', 'theft', 'return', 'correction', 'expiry', 'recall'] },
   reason: { type: String, required: true },
@@ -728,7 +739,8 @@ const InventoryAdjustmentSchema = new Schema<IInventoryAdjustment>({
 }, { timestamps: true });
 
 const ReorderPointSchema = new Schema<IReorderPoint>({
-  pointId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+  pointId: { type: String, required: true, index: true },
   productId: { type: String, required: true, index: true },
   sku: { type: String, required: true },
   warehouseId: { type: String, required: true, index: true },
@@ -778,31 +790,40 @@ const ReorderPointSchema = new Schema<IReorderPoint>({
 }, { timestamps: true });
 
 // Indexes
+WarehouseSchema.index({ tenantId: 1, warehouseId: 1 }, { unique: true });
+WarehouseSchema.index({ tenantId: 1, code: 1 }, { unique: true });
 WarehouseSchema.index({ 'location.city': 1, 'location.state': 1 });
-WarehouseSchema.index({ status: 1 });
-WarehouseSchema.index({ type: 1 });
+WarehouseSchema.index({ tenantId: 1, status: 1 });
+WarehouseSchema.index({ tenantId: 1, type: 1 });
 
+InventoryItemSchema.index({ tenantId: 1, itemId: 1 }, { unique: true });
+InventoryItemSchema.index({ tenantId: 1, barcode: 1 }, { unique: true });
+InventoryItemSchema.index({ tenantId: 1, qrCode: 1 }, { unique: true });
 InventoryItemSchema.index({ warehouseId: 1, productId: 1 });
 InventoryItemSchema.index({ warehouseId: 1, sku: 1 });
 InventoryItemSchema.index({ warehouseId: 1, zoneId: 1 });
-InventoryItemSchema.index({ status: 1 });
+InventoryItemSchema.index({ tenantId: 1, status: 1 });
 InventoryItemSchema.index({ 'alerts.type': 1, 'alerts.severity': 1 });
 InventoryItemSchema.index({ 'storage.expiryDate': 1 });
 
+StockTransferSchema.index({ tenantId: 1, transferId: 1 }, { unique: true });
 StockTransferSchema.index({ fromWarehouseId: 1, toWarehouseId: 1 });
-StockTransferSchema.index({ status: 1 });
+StockTransferSchema.index({ tenantId: 1, status: 1 });
 StockTransferSchema.index({ transferDate: -1 });
 StockTransferSchema.index({ priority: 1 });
 
-CycleCountSchema.index({ warehouseId: 1, status: 1 });
+CycleCountSchema.index({ tenantId: 1, countId: 1 }, { unique: true });
+CycleCountSchema.index({ tenantId: 1, warehouseId: 1, status: 1 });
 CycleCountSchema.index({ scheduledDate: 1 });
 CycleCountSchema.index({ assignedTo: 1 });
 
-InventoryAdjustmentSchema.index({ warehouseId: 1, status: 1 });
+InventoryAdjustmentSchema.index({ tenantId: 1, adjustmentId: 1 }, { unique: true });
+InventoryAdjustmentSchema.index({ tenantId: 1, warehouseId: 1, status: 1 });
 InventoryAdjustmentSchema.index({ adjustmentType: 1 });
 InventoryAdjustmentSchema.index({ requestedAt: -1 });
 
-ReorderPointSchema.index({ productId: 1, warehouseId: 1 });
+ReorderPointSchema.index({ tenantId: 1, pointId: 1 }, { unique: true });
+ReorderPointSchema.index({ tenantId: 1, productId: 1, warehouseId: 1 });
 ReorderPointSchema.index({ warehouseId: 1, 'alerts.lowStockAlert': 1 });
 ReorderPointSchema.index({ nextReviewDate: 1 });
 

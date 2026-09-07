@@ -1,13 +1,21 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { Role as IRole } from '../../../shared/types';
-
-export interface RoleDocument extends Omit<IRole, '_id'>, Document { }
+export interface RoleDocument extends Document {
+    tenantId: mongoose.Types.ObjectId;
+    name: string;
+    description?: string;
+    permissions?: mongoose.Types.ObjectId[];
+}
 
 const roleSchema = new Schema<RoleDocument>({
+    tenantId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Tenant',
+        required: [true, 'Tenant ID is required'],
+        index: true
+    },
     name: {
         type: String,
         required: [true, 'Role name is required'],
-        unique: true,
         trim: true
     },
     description: {
@@ -29,6 +37,6 @@ const roleSchema = new Schema<RoleDocument>({
 });
 
 // Indexes
-roleSchema.index({ name: 1 });
+roleSchema.index({ tenantId: 1, name: 1 }, { unique: true });
 
 export const Role = mongoose.model<RoleDocument>('Role', roleSchema);

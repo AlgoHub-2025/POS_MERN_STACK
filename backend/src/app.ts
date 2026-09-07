@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import swaggerJsdoc from 'swagger-jsdoc';
@@ -15,7 +16,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
 // Import routes (will be created as we build them)
-import authRoutes from './routes/auth-simple';
+import authRoutes from './routes/auth';
 import productRoutes from './routes/productRoutes';
 
 class App {
@@ -25,6 +26,7 @@ class App {
 
   constructor() {
     this.app = express();
+    this.app.set('logger', logger);
     const allowedOrigins = this.getAllowedOrigins();
     this.server = createServer(this.app);
     this.io = new SocketIOServer(this.server, {
@@ -171,19 +173,50 @@ class App {
   }
 
   private initializeSocketIO(): void {
-    this.io.on('connection', (socket) => {
-      logger.info(`Client connected: ${socket.id}`);
+    this.io.use((socket, next) => {
+      try {
+        const token = socket.handshake.auth?.token || socket.handshake.headers.authorization?.toString().replace(/^Bearer\s+/i, '');
+        if (!token) {
+          next(new Error('Authentication required'));
+          return;
+        }
 
-      // Join tenant room
-      socket.on('join-tenant', (tenantId: string) => {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+          userId: string;
+          tenantId?: string;
+          role: string;
+          email: string;
+        };
+        const tenantId = decoded.tenantId;
+        if (!tenantId || !decoded.userId) {
+          next(new Error('Tenant context required'));
+          return;
+        }
+
+        socket.data.userId = decoded.userId;
+        socket.data.tenantId = tenantId;
+        socket.data.role = decoded.role;
+        socket.data.email = decoded.email;
+        next();
+      } catch {
+        next(new Error('Invalid or expired token'));
+      }
+    });
+
+    this.io.on('connection', (socket) => {
+      const tenantId = socket.data.tenantId;
+      socket.join(`tenant-${tenantId}`);
+      logger.info(`Client connected: ${socket.id}`, { tenantId, userId: socket.data.userId });
+
+      socket.on('join-tenant', () => {
         socket.join(`tenant-${tenantId}`);
-        logger.info(`Client ${socket.id} joined tenant ${tenantId}`);
+        logger.info(`Client ${socket.id} joined own tenant room`, { tenantId });
       });
 
       // Join warehouse room
       socket.on('join-warehouse', (warehouseId: string) => {
-        socket.join(`warehouse-${warehouseId}`);
-        logger.info(`Client ${socket.id} joined warehouse ${warehouseId}`);
+        socket.join(`tenant-${tenantId}:warehouse-${warehouseId}`);
+        logger.info(`Client ${socket.id} joined warehouse ${warehouseId}`, { tenantId });
       });
 
       // Handle disconnection

@@ -4,6 +4,8 @@ import { User, LoginRequest, RegisterRequest, AuthTokens } from '@/types'
 interface AuthResponse {
   user: User
   tokens: AuthTokens
+  tenant?: unknown
+  success?: boolean
 }
 
 class AuthService {
@@ -13,7 +15,8 @@ class AuthService {
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/register', userData)
+    const { confirmPassword, ...registrationData } = userData
+    const response = await api.post<AuthResponse>('/auth/register', registrationData)
     return response.data
   }
 
@@ -27,21 +30,21 @@ class AuthService {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await api.get<User>('/auth/me')
-    return response.data
+    const response = await api.get<{ user: User }>('/auth/me')
+    return response.data.user
   }
 
   async updateProfile(userData: Partial<User>): Promise<User> {
-    const response = await api.put<User>('/auth/profile', userData)
-    return response.data
+    const response = await api.put<{ user: User }>('/auth/profile', userData)
+    return response.data.user
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await api.post('/auth/change-password', { currentPassword, newPassword })
+    await api.put('/auth/change-password', { currentPassword, newPassword })
   }
 
-  async forgotPassword(email: string): Promise<void> {
-    await api.post('/auth/forgot-password', { email })
+  async forgotPassword(email: string, tenantSlug: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email, tenantSlug })
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {

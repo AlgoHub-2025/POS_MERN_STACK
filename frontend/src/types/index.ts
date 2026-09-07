@@ -1,11 +1,14 @@
 // Authentication Types
 export interface LoginRequest {
+  tenantSlug: string
   email: string
   password: string
   remember?: boolean
 }
 
 export interface RegisterRequest {
+  tenantName: string
+  tenantSlug: string
   firstName: string
   lastName: string
   email: string
@@ -17,7 +20,7 @@ export interface RegisterRequest {
 export interface AuthTokens {
   accessToken: string
   refreshToken: string
-  expiresIn: number
+  expiresIn?: number
 }
 
 // Tenant Types

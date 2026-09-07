@@ -1,406 +1,498 @@
-import express from 'express'
-import Joi from 'joi'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import { body, validationResult } from 'express-validator'
-import { User } from '../models/User'
-import { authMiddleware } from '../middleware/auth'
+import crypto from 'crypto';
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import { z } from 'zod';
+import { authMiddleware } from '../middleware/auth';
+import { validateBody } from '../middleware/validate';
+import { Session } from '../models/Session';
+import { Tenant } from '../models/Tenant';
+import { User, UserDocument } from '../models/User';
 
-const router = express.Router()
+const router = express.Router();
 
-// Validation schemas
-const registerSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
-  firstName: Joi.string().min(2).required(),
-  lastName: Joi.string().min(2).required(),
-  role: Joi.string().valid('admin', 'manager', 'cashier').optional()
-})
+const registerSchema = z.object({
+  email: z.string().email().transform((value) => value.toLowerCase().trim()),
+  password: z.string().min(8),
+  firstName: z.string().min(2).max(50).transform((value) => value.trim()),
+  lastName: z.string().min(2).max(50).transform((value) => value.trim()),
+  phone: z.string().trim().optional(),
+  tenantName: z.string().min(2).max(100).transform((value) => value.trim()),
+  tenantSlug: z.string()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9-]+$/, 'Tenant slug can only contain lowercase letters, numbers, and hyphens')
+    .transform((value) => value.toLowerCase().trim()),
+}).strict();
 
-const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().required()
-})
+const loginSchema = z.object({
+  email: z.string().email().transform((value) => value.toLowerCase().trim()),
+  password: z.string().min(1),
+  tenantSlug: z.string().min(1).transform((value) => value.toLowerCase().trim()),
+}).strict();
 
-// Validation middleware
-const validateRequest = (schema: Joi.ObjectSchema) => {
-  return (req: express.Request, res: express.Response, next: express.NextFunction): void => {
-    const { error } = schema.validate(req.body)
-    if (error) {
-      res.status(400).json({
-        message: 'Validation failed',
-        errors: error.details.map(detail => ({
-          field: detail.path[0],
-          message: detail.message
-        }))
-      })
-      return
-    }
-    next()
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
+}).strict();
+
+const logoutSchema = refreshSchema;
+
+const profileSchema = z.object({
+  firstName: z.string().min(2).max(50).trim().optional(),
+  lastName: z.string().min(2).max(50).trim().optional(),
+  phone: z.string().trim().optional(),
+}).strict();
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+}).strict();
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email().transform((value) => value.toLowerCase().trim()),
+  tenantSlug: z.string().min(1).transform((value) => value.toLowerCase().trim()),
+}).strict();
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+}).strict();
+
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is required');
   }
-}
+  return secret;
+};
 
-// Validation middleware for express-validator
-const validateExpress = (req: express.Request, res: express.Response, next: express.NextFunction): void => {
-  const errors = validationResult(req)
-  if (!errors.isEmpty()) {
-    res.status(400).json({ message: 'Validation failed', errors: errors.array() })
-    return
+const getRefreshSecret = (): string => {
+  const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET is required');
   }
-  next()
-}
+  return secret;
+};
 
-// Register
-router.post('/register', validateRequest(registerSchema), async (req: express.Request, res: express.Response): Promise<void> => {
+const hashToken = (token: string): string => {
+  return crypto.createHash('sha256').update(token).digest('hex');
+};
+
+const parseDurationMs = (value: string): number => {
+  const match = value.trim().match(/^(\d+)(ms|s|m|h|d)?$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+
+  const amount = Number.parseInt(match[1], 10);
+  const unit = match[2] || 'ms';
+
+  switch (unit) {
+    case 'd':
+      return amount * 24 * 60 * 60 * 1000;
+    case 'h':
+      return amount * 60 * 60 * 1000;
+    case 'm':
+      return amount * 60 * 1000;
+    case 's':
+      return amount * 1000;
+    case 'ms':
+    default:
+      return amount;
+  }
+};
+
+const refreshExpiryDate = (): Date => {
+  const configuredExpiry = process.env.JWT_REFRESH_EXPIRES_IN || `${process.env.JWT_REFRESH_EXPIRES_DAYS || '7'}d`;
+  return new Date(Date.now() + parseDurationMs(configuredExpiry));
+};
+
+const publicUser = (user: UserDocument) => ({
+  id: user._id.toString(),
+  tenantId: user.tenantId.toString(),
+  email: user.email,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  phone: user.phone,
+  role: user.role,
+  isActive: user.isActive,
+  emailVerified: user.emailVerified,
+  createdAt: user.createdAt,
+  lastLoginAt: user.lastLoginAt,
+});
+
+const publicTenant = (tenant: { _id: unknown; name: string; slug: string; plan: string; isActive: boolean; createdAt?: Date; updatedAt?: Date }) => ({
+  id: String(tenant._id),
+  name: tenant.name,
+  slug: tenant.slug,
+  plan: tenant.plan,
+  isActive: tenant.isActive,
+  createdAt: tenant.createdAt,
+  updatedAt: tenant.updatedAt,
+});
+
+const createTokens = async (user: UserDocument) => {
+  const payload = {
+    userId: user._id.toString(),
+    email: user.email,
+    role: user.role,
+    tenantId: user.tenantId.toString(),
+  };
+
+  const accessToken = jwt.sign(payload, getJwtSecret(), {
+    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  } as jwt.SignOptions);
+
+  const refreshToken = jwt.sign(
+    {
+      userId: user._id.toString(),
+      tenantId: user.tenantId.toString(),
+      sessionId: new mongoose.Types.ObjectId().toString(),
+    },
+    getRefreshSecret(),
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' } as jwt.SignOptions
+  );
+
+  await Session.create({
+    userId: user._id,
+    tenantId: user.tenantId,
+    tokenHash: hashToken(refreshToken),
+    expiresAt: refreshExpiryDate(),
+  });
+
+  return { accessToken, refreshToken };
+};
+
+const authResponse = async (
+  user: UserDocument,
+  tenant: { _id: unknown; name: string; slug: string; plan: string; isActive: boolean; createdAt?: Date; updatedAt?: Date },
+  message: string,
+) => {
+  const tokens = await createTokens(user);
+  return {
+    success: true,
+    message,
+    tenant: publicTenant(tenant),
+    user: publicUser(user),
+    token: tokens.accessToken,
+    tokens,
+  };
+};
+
+const isTransactionUnsupported = (error: unknown): boolean => {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: number }).code === 20;
+};
+
+const createTenantAndAdmin = async (
+  data: z.infer<typeof registerSchema>,
+  mongoSession?: mongoose.ClientSession
+) => {
+  const { email, password, firstName, lastName, phone, tenantName, tenantSlug } = data;
+
+  const tenantQuery = Tenant.findOne({ slug: tenantSlug });
+  const existingTenant = mongoSession ? await tenantQuery.session(mongoSession) : await tenantQuery;
+  if (existingTenant) {
+    return { conflict: 'Tenant slug already exists' };
+  }
+
+  const [tenant] = await Tenant.create([{
+    name: tenantName,
+    slug: tenantSlug,
+    plan: 'basic',
+    isActive: true,
+  }], mongoSession ? { session: mongoSession } : undefined);
+
   try {
-    const { email, password, firstName, lastName, role = 'cashier' } = req.body
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email })
-    if (existingUser) {
-      return res.status(409).json({ message: 'User already exists' })
-    }
-
-    // Create user
-    const user = new User({
+    const [user] = await User.create([{
+      tenantId: tenant._id,
       email,
       password,
       firstName,
       lastName,
-      role,
+      phone,
+      role: 'admin',
       isActive: true,
-      emailVerified: false
-    })
+      emailVerified: false,
+    }], mongoSession ? { session: mongoSession } : undefined);
 
-    await user.save()
-
-    // Generate tokens
-    const accessToken = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '15m' }
-    )
-
-    const refreshToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_REFRESH_SECRET!,
-      { expiresIn: '7d' }
-    )
-
-    // Return user data without password
-    const userResponse = {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt
-    }
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: userResponse,
-      tokens: {
-        accessToken,
-        refreshToken
-      }
-    })
+    return { tenant, user };
   } catch (error) {
-    console.error('Registration error:', error)
-    res.status(500).json({ message: 'Internal server error' })
+    if (!mongoSession) {
+      await Tenant.deleteOne({ _id: tenant._id });
+    }
+    throw error;
   }
-})
+};
 
-// Login
-router.post('/login', validateRequest(loginSchema), async (req: express.Request, res: express.Response): Promise<void> => {
+router.post('/register', validateBody(registerSchema), async (req, res, next): Promise<void> => {
+  const mongoSession = await mongoose.startSession();
+
   try {
-    const { email, password } = req.body
+    mongoSession.startTransaction();
+    const result = await createTenantAndAdmin(req.body, mongoSession);
 
-    // Find user
-    const user = await User.findOne({ email })
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' })
+    if ('conflict' in result) {
+      await mongoSession.abortTransaction();
+      res.status(409).json({ success: false, message: result.conflict });
+      return;
     }
 
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated' })
-    }
+    await mongoSession.commitTransaction();
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password)
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' })
-    }
-
-    // Generate tokens
-    const accessToken = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '15m' }
-    )
-
-    const refreshToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_REFRESH_SECRET!,
-      { expiresIn: '7d' }
-    )
-
-    // Update last login
-    user.lastLoginAt = new Date()
-    await user.save()
-
-    // Return user data without password
-    const userResponse = {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt
-    }
-
-    res.json({
-      message: 'Login successful',
-      user: userResponse,
-      tokens: {
-        accessToken,
-        refreshToken
-      }
-    })
+    res.status(201).json(await authResponse(
+      result.user,
+      result.tenant,
+      'Tenant and admin user registered successfully'
+    ));
   } catch (error) {
-    console.error('Login error:', error)
-    res.status(500).json({ message: 'Internal server error' })
-  }
-})
+    await mongoSession.abortTransaction().catch(() => undefined);
 
-// Refresh token
-router.post('/refresh', [
-  body('refreshToken').notEmpty().withMessage('Refresh token is required'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
-  try {
-    const { refreshToken } = req.body
+    if (isTransactionUnsupported(error)) {
+      try {
+        const result = await createTenantAndAdmin(req.body);
+        if ('conflict' in result) {
+          res.status(409).json({ success: false, message: result.conflict });
+          return;
+        }
 
-    // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any
-    const userId = decoded.userId
-
-    // Find user
-    const user = await User.findById(userId)
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Invalid refresh token' })
-    }
-
-    // Generate new access token
-    const newAccessToken = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '15m' }
-    )
-
-    res.json({
-      tokens: {
-        accessToken: newAccessToken,
-        refreshToken // Keep the same refresh token
-      }
-    })
-  } catch (error) {
-    console.error('Token refresh error:', error)
-    res.status(401).json({ message: 'Invalid refresh token' })
-  }
-})
-
-// Logout
-router.post('/logout', [
-  body('refreshToken').notEmpty().withMessage('Refresh token is required'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
-  try {
-    const { refreshToken } = req.body
-
-    // In a real application, you might want to blacklist the refresh token
-    // For now, we'll just verify it's valid and return success
-    jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!)
-
-    res.json({ message: 'Logout successful' })
-  } catch (error) {
-    console.error('Logout error:', error)
-    res.status(400).json({ message: 'Invalid refresh token' })
-  }
-})
-
-// Get current user
-router.get('/me', authMiddleware, async (req: express.Request, res: express.Response) => {
-  try {
-    const userId = (req as any).user.userId
-    const user = await User.findById(userId).select('-password')
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
-    }
-
-    res.json({
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt
-    })
-  } catch (error) {
-    console.error('Get current user error:', error)
-    res.status(500).json({ message: 'Internal server error' })
-  }
-})
-
-// Update profile
-router.put('/profile', authMiddleware, [
-  body('firstName').optional().trim().isLength({ min: 2 }).withMessage('First name must be at least 2 characters'),
-  body('lastName').optional().trim().isLength({ min: 2 }).withMessage('Last name must be at least 2 characters'),
-  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
-  try {
-    const userId = (req as any).user.userId
-    const { firstName, lastName, email, role } = req.body
-
-    const user = await User.findById(userId)
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
-    }
-
-    // Check if email is being changed and if it's already taken
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email })
-      if (existingUser) {
-        return res.status(409).json({ message: 'Email already exists' })
+        res.status(201).json(await authResponse(
+          result.user,
+          result.tenant,
+          'Tenant and admin user registered successfully'
+        ));
+        return;
+      } catch (fallbackError) {
+        next(fallbackError);
+        return;
       }
     }
 
-    if (firstName) user.firstName = firstName
-    if (lastName) user.lastName = lastName
-    if (email && email !== user.email) {
-      user.email = email
-      user.emailVerified = false // Re-verify new email
-    }
-    if (role) user.role = role
-    await user.save()
-
-    res.json({
-      message: 'Profile updated successfully',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-        emailVerified: user.emailVerified,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt
-      }
-    })
-  } catch (error) {
-    console.error('Update profile error:', error)
-    res.status(500).json({ message: 'Internal server error' })
+    next(error);
+  } finally {
+    await mongoSession.endSession();
   }
-})
+});
 
-// Change password
-router.put('/change-password', authMiddleware, [
-  body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
+router.post('/login', validateBody(loginSchema), async (req, res, next): Promise<void> => {
   try {
-    const userId = (req as any).user.userId
-    const { currentPassword, newPassword } = req.body
+    const { email, password, tenantSlug } = req.body;
+    const tenant = await Tenant.findOne({ slug: tenantSlug, isActive: true });
 
-    const user = await User.findById(userId)
+    if (!tenant) {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return;
+    }
+
+    const user = await User.findOne({ tenantId: tenant._id, email, isActive: true }).select('+password');
+    if (!user || !(await user.comparePassword(password))) {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return;
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    res.json(await authResponse(user, tenant, 'Login successful'));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/refresh', validateBody(refreshSchema), async (req, res, next): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    const decoded = jwt.verify(refreshToken, getRefreshSecret()) as { userId: string; tenantId?: string };
+    const tenantId = decoded.tenantId;
+
+    if (!decoded.userId || !tenantId) {
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
+    }
+
+    const tokenHash = hashToken(refreshToken);
+
+    const session = await Session.findOne({
+      tokenHash,
+      userId: decoded.userId,
+      tenantId,
+      revokedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!session) {
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
+    }
+
+    const user = await User.findOne({
+      _id: decoded.userId,
+      tenantId,
+      isActive: true,
+    });
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
     }
 
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password)
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({ message: 'Current password is incorrect' })
+    session.revokedAt = new Date();
+    await session.save();
+
+    const tenant = await Tenant.findOne({ _id: user.tenantId, isActive: true });
+    if (!tenant) {
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
     }
 
-    // Update password (model hook will handle hashing)
-    user.password = newPassword
-    await user.save()
-    res.json({ message: 'Password changed successfully' })
+    res.json(await authResponse(user, tenant, 'Token refreshed successfully'));
   } catch (error) {
-    console.error('Change password error:', error)
-    res.status(500).json({ message: 'Internal server error' })
+    next(error);
   }
-})
+});
 
-// Forgot password
-router.post('/forgot-password', [
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
+router.post('/logout', validateBody(logoutSchema), async (req, res, next): Promise<void> => {
   try {
-    const { email } = req.body
+    const { refreshToken } = req.body;
+    const decoded = jwt.verify(refreshToken, getRefreshSecret()) as { userId: string; tenantId?: string };
+    const tenantId = decoded.tenantId;
 
-    const user = await User.findOne({ email })
+    if (!decoded.userId || !tenantId) {
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
+    }
+
+    const tokenHash = hashToken(refreshToken);
+    await Session.updateOne(
+      { tokenHash, userId: decoded.userId, tenantId, revokedAt: { $exists: false } },
+      { $set: { revokedAt: new Date() } }
+    );
+    res.json({ success: true, message: 'Logout successful' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/me', authMiddleware, async (req, res, next): Promise<void> => {
+  try {
+    const user = await User.findOne({
+      _id: req.user?.userId,
+      tenantId: req.user?.tenantId,
+      isActive: true,
+    });
+
     if (!user) {
-      // Don't reveal if user exists or not
-      return res.json({ message: 'If an account exists, a reset link has been sent' })
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
     }
 
-    // Generate reset token (in a real app, you'd send this via email)
-    const resetToken = jwt.sign(
-      { userId: user._id, type: 'password-reset' },
-      process.env.JWT_SECRET!,
-      { expiresIn: '1h' }
-    )
-
-    // For now, just return success (in production, send email)
-    console.log(`Password reset token for ${email}: ${resetToken}`)
-
-    res.json({ message: 'If an account exists, a reset link has been sent' })
+    res.json({ success: true, user: publicUser(user) });
   } catch (error) {
-    console.error('Forgot password error:', error)
-    res.status(500).json({ message: 'Internal server error' })
+    next(error);
   }
-})
+});
 
-// Reset password
-router.post('/reset-password', [
-  body('token').notEmpty().withMessage('Reset token is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
-], validateExpress, async (req: express.Request, res: express.Response): Promise<void> => {
+router.put('/profile', authMiddleware, validateBody(profileSchema), async (req, res, next): Promise<void> => {
   try {
-    const { token, newPassword } = req.body
+    const user = await User.findOneAndUpdate(
+      { _id: req.user?.userId, tenantId: req.user?.tenantId },
+      req.body,
+      { new: true, runValidators: true }
+    );
 
-    // Verify reset token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully', user: publicUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/change-password', authMiddleware, validateBody(changePasswordSchema), async (req, res, next): Promise<void> => {
+  try {
+    const user = await User.findOne({
+      _id: req.user?.userId,
+      tenantId: req.user?.tenantId,
+      isActive: true,
+    }).select('+password');
+
+    if (!user || !(await user.comparePassword(req.body.currentPassword))) {
+      res.status(401).json({ success: false, message: 'Current password is incorrect' });
+      return;
+    }
+
+    user.password = req.body.newPassword;
+    await user.save();
+    await Session.updateMany({ userId: user._id, revokedAt: { $exists: false } }, { $set: { revokedAt: new Date() } });
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, res, next): Promise<void> => {
+  try {
+    const tenant = await Tenant.findOne({ slug: req.body.tenantSlug, isActive: true });
+    const user = tenant
+      ? await User.findOne({ tenantId: tenant._id, email: req.body.email, isActive: true })
+      : null;
+
+    if (user) {
+      const resetToken = jwt.sign(
+        { userId: user._id.toString(), tenantId: user.tenantId.toString(), type: 'password-reset' },
+        getJwtSecret(),
+        { expiresIn: '1h' }
+      );
+      // TODO: send email; do not return token in production.
+      req.app.get('logger')?.info?.('Password reset requested', { userId: user._id.toString(), tenantId: user.tenantId.toString() });
+    }
+
+    res.json({ success: true, message: 'If an account exists, a reset link has been sent' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/reset-password', validateBody(resetPasswordSchema), async (req, res, next): Promise<void> => {
+  try {
+    const decoded = jwt.verify(req.body.token, getJwtSecret()) as { userId: string; tenantId?: string; type: string };
+    const tenantId = decoded.tenantId;
     if (decoded.type !== 'password-reset') {
-      return res.status(400).json({ message: 'Invalid reset token' })
+      res.status(400).json({ success: false, message: 'Invalid reset token' });
+      return;
     }
 
-    const userId = decoded.userId
-    const user = await User.findById(userId)
+    if (!tenantId) {
+      res.status(400).json({ success: false, message: 'Invalid reset token' });
+      return;
+    }
+
+    const user = await User.findOne({ _id: decoded.userId, tenantId, isActive: true });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid reset token' })
+      res.status(400).json({ success: false, message: 'Invalid reset token' });
+      return;
     }
 
-    // Update password (model hook will handle hashing)
-    user.password = newPassword
-    await user.save()
+    user.password = req.body.newPassword;
+    await user.save();
+    await Session.updateMany({ userId: user._id, revokedAt: { $exists: false } }, { $set: { revokedAt: new Date() } });
 
-    res.json({ message: 'Password reset successful' })
+    res.json({ success: true, message: 'Password reset successful' });
   } catch (error) {
-    console.error('Reset password error:', error)
-    res.status(400).json({ message: 'Invalid or expired reset token' })
+    next(error);
   }
-})
+});
 
-export default router
+router.post('/verify-email', authMiddleware, (_req, res) => {
+  res.status(501).json({ success: false, message: 'Email verification is not configured yet' });
+});
+
+router.post('/resend-verification', authMiddleware, (_req, res) => {
+  res.status(501).json({ success: false, message: 'Email verification is not configured yet' });
+});
+
+export default router;

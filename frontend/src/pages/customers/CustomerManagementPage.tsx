@@ -159,7 +159,7 @@ export const CustomerManagementPage: React.FC = () => {
       points: 1000,
       benefits: ['10% points bonus', 'Free drink on birthday', 'Exclusive offers'],
       nextTierPoints: 2500,
-      color: 'bg-gray-600 text-gray-300 border-gray-400/30',
+      color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-400/30',
       icon: Star
     },
     {
@@ -184,10 +184,10 @@ export const CustomerManagementPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-900/50 text-green-400 border-green-400/30'
-      case 'vip': return 'bg-purple-900/50 text-purple-400 border-purple-400/30'
-      case 'inactive': return 'bg-red-900/50 text-red-400 border-red-400/30'
-      default: return 'bg-gray-700 text-gray-400'
+      case 'active': return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-400 dark:border-green-400/30'
+      case 'vip': return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-400 dark:border-purple-400/30'
+      case 'inactive': return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-400/30'
+      default: return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'
     }
   }
 
@@ -226,33 +226,33 @@ export const CustomerManagementPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-400 rounded-full animate-spin border-t-transparent"></div>
-          <p className="text-green-400 mt-4">Loading Customers...</p>
+          <div className="w-16 h-16 border-4 border-green-500 dark:border-green-400 rounded-full animate-spin border-t-transparent"></div>
+          <p className="text-green-700 dark:text-green-400 mt-4">Loading Customers...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 p-4 sm:p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-green-400 mb-2">Customer Management</h1>
-        <p className="text-gray-400">Manage customer relationships, loyalty programs, and engagement</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-green-400 mb-2">Customer Management</h1>
+        <p className="text-gray-600 dark:text-gray-400">Manage customer relationships, loyalty programs, and engagement</p>
       </div>
 
       {/* Loyalty Program Overview */}
-      <div className="bg-gradient-to-r from-purple-900/50 to-orange-900/50 rounded-xl p-6 border border-purple-400/30 mb-8">
+      <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-xl p-4 sm:p-6 border border-purple-200 mb-8 dark:from-purple-900/50 dark:to-orange-900/50 dark:border-purple-400/30">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-green-400 flex items-center">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-green-400 flex items-center">
             <Crown className="w-6 h-6 mr-3" />
             Loyalty Program
           </h2>
           <button
             onClick={() => setShowLoyaltyInfo(showLoyaltyInfo ? null : 'overview')}
-            className="text-purple-400 hover:text-purple-300 transition-colors duration-200"
+            className="text-purple-700 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-200"
           >
             <Eye className="w-5 h-5" />
           </button>
@@ -270,8 +270,8 @@ export const CustomerManagementPage: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <div className="text-sm">
-                      <span className="text-gray-400">Points Required:</span>
-                      <span className="text-white ml-2">{tier.points}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Points Required:</span>
+                      <span className="text-gray-900 dark:text-white ml-2">{tier.points}</span>
                     </div>
                     <div className="text-xs space-y-1">
                       {tier.benefits.map((benefit, index) => (
@@ -290,8 +290,8 @@ export const CustomerManagementPage: React.FC = () => {
       </div>
 
       {/* Filters and Actions */}
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-xl p-4 sm:p-6 border border-gray-200 shadow-sm mb-6 dark:bg-gray-800 dark:border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -300,7 +300,7 @@ export const CustomerManagementPage: React.FC = () => {
               placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-green-400 placeholder-green-400/40"
+              className="w-full bg-white border border-gray-300 rounded-lg pl-10 pr-4 py-3 text-gray-900 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-green-400 dark:placeholder-green-400/40"
             />
           </div>
 
@@ -308,7 +308,7 @@ export const CustomerManagementPage: React.FC = () => {
           <select
             value={selectedTier}
             onChange={(e) => setSelectedTier(e.target.value)}
-            className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-green-400"
+            className="bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-green-400"
           >
             <option value="all">All Tiers</option>
             {loyaltyTiers.map(tier => (
@@ -322,7 +322,7 @@ export const CustomerManagementPage: React.FC = () => {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-green-400"
+            className="bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-green-400"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -331,12 +331,12 @@ export const CustomerManagementPage: React.FC = () => {
           </select>
 
           {/* Actions */}
-          <div className="flex space-x-2">
-            <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row xl:flex-row gap-2">
+            <button className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
               <Plus className="w-4 h-4" />
               <span>Add Customer</span>
             </button>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2">
+            <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
               <Download className="w-4 h-4" />
               <span>Export</span>
             </button>
@@ -351,20 +351,20 @@ export const CustomerManagementPage: React.FC = () => {
           const TierIcon = tierInfo?.icon || Star
           
           return (
-            <div key={customer.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-green-400/50 transition-all duration-200">
+            <div key={customer.id} className="min-w-0 bg-white rounded-xl p-4 sm:p-6 border border-gray-200 shadow-sm hover:border-green-400/50 transition-all duration-200 dark:bg-gray-800 dark:border-gray-700">
               {/* Customer Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                <div className="flex min-w-0 items-center space-x-3">
+                  <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-bold">
                       {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
                     </span>
                   </div>
-                  <div>
-                    <h3 className="text-green-400 font-semibold text-lg">
+                  <div className="min-w-0">
+                    <h3 className="text-green-700 dark:text-green-400 font-semibold text-lg break-words">
                       {customer.firstName} {customer.lastName}
                     </h3>
-                    <p className="text-gray-400 text-sm">{customer.email}</p>
+                    <p className="text-gray-700 dark:text-gray-400 text-sm break-words">{customer.email}</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end space-y-2">
@@ -383,34 +383,34 @@ export const CustomerManagementPage: React.FC = () => {
               {/* Customer Stats */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-gray-400 text-xs">Total Spent</p>
-                  <p className="text-green-400 font-semibold">{formatCurrency(customer.totalSpent)}</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">Total Spent</p>
+                  <p className="break-words text-green-700 dark:text-green-400 font-semibold">{formatCurrency(customer.totalSpent)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-xs">Orders</p>
-                  <p className="text-green-400 font-semibold">{customer.orderCount}</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">Orders</p>
+                  <p className="text-green-700 dark:text-green-400 font-semibold">{customer.orderCount}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-xs">Loyalty Points</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">Loyalty Points</p>
                   <p className="text-purple-400 font-semibold">{customer.loyaltyPoints}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-xs">Member Since</p>
-                  <p className="text-gray-300 font-semibold">{customer.joinDate}</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">Member Since</p>
+                  <p className="text-gray-800 dark:text-gray-300 font-semibold">{customer.joinDate}</p>
                 </div>
               </div>
 
               {/* Customer Info */}
               <div className="space-y-2 mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-300">
+                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                   <Phone className="w-4 h-4" />
                   <span>{customer.phone}</span>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-300">
+                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                   <MapPin className="w-4 h-4" />
                   <span>{customer.city}</span>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-300">
+                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                   <Calendar className="w-4 h-4" />
                   <span>Last visit: {customer.lastVisit}</span>
                 </div>
@@ -422,27 +422,27 @@ export const CustomerManagementPage: React.FC = () => {
                   type="checkbox"
                   checked={selectedCustomers.includes(customer.id)}
                   onChange={() => handleSelectCustomer(customer.id)}
-                  className="w-4 h-4 text-green-400 bg-gray-700 border-gray-600 rounded"
+                  className="w-4 h-4 text-green-500 bg-white border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
                 />
                 <button
                   onClick={() => handleViewDetails(customer.id)}
-                  className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 dark:bg-gray-700 dark:hover:bg-gray-600"
                   title="View Details"
                 >
-                  <Eye className="w-4 h-4 text-gray-400" />
+                  <Eye className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 </button>
                 <button
                   onClick={() => handleSendEmail(customer.id)}
-                  className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 dark:bg-gray-700 dark:hover:bg-gray-600"
                   title="Send Email"
                 >
-                  <Mail className="w-4 h-4 text-gray-400" />
+                  <Mail className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 </button>
                 <button
-                  className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 dark:bg-gray-700 dark:hover:bg-gray-600"
                   title="Edit Customer"
                 >
-                  <Edit className="w-4 h-4 text-gray-400" />
+                  <Edit className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -453,8 +453,8 @@ export const CustomerManagementPage: React.FC = () => {
       {/* Empty State */}
       {filteredCustomers.length === 0 && (
         <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 text-lg mb-2">No customers found</p>
+          <Users className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-400 text-lg mb-2">No customers found</p>
           <p className="text-gray-500">Try adjusting your filters or add new customers</p>
         </div>
       )}

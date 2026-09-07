@@ -1,37 +1,41 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import { Product } from '../models/Product';
 
-export const getProductAnalytics = async (req: Request, res: Response) => {
+export const getProductAnalytics = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Mock analytics data for now - replace with real DB queries
-    const analytics = {
-      totalProducts: 157,
-      totalValue: 45890.50,
-      lowStockCount: 12,
-      outOfStockCount: 5,
-      topCategories: [
-        { name: 'Beverages', count: 45, value: 12500.00 },
-        { name: 'Bakery', count: 32, value: 8900.50 },
-        { name: 'Snacks', count: 28, value: 5600.75 },
-      ],
-      recentActivity: [
-        { type: 'added', product: 'Espresso', quantity: 50, date: new Date() },
-        { type: 'sold', product: 'Croissant', quantity: 12, date: new Date() },
-      ],
-      stockAlerts: [
-        { product: 'Croissant', current: 3, threshold: 10 },
-        { product: 'Muffin', current: 5, threshold: 15 },
-      ]
-    };
-    
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      res.status(403).json({ success: false, message: 'Tenant context required' });
+      return;
+    }
+
+    const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
+    const [totalProducts, totalValueResult, lowStockCount] = await Promise.all([
+      Product.countDocuments({ tenantId: tenantObjectId, isActive: true }),
+      Product.aggregate([
+        { $match: { tenantId: tenantObjectId, isActive: true } },
+        { $group: { _id: null, totalValue: { $sum: '$price' } } },
+      ]),
+      Product.countDocuments({ tenantId: tenantObjectId, isActive: true, reorderLevel: { $exists: true, $lte: 10 } }),
+    ]);
+
     res.status(200).json({
       success: true,
-      data: analytics
+      data: {
+        totalProducts,
+        totalValue: totalValueResult[0]?.totalValue || 0,
+        lowStockCount,
+        outOfStockCount: 0,
+        topCategories: [],
+        recentActivity: [],
+        stockAlerts: [],
+      },
     });
   } catch (error) {
-    console.error('Error fetching product analytics:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch product analytics'
+      message: 'Failed to fetch product analytics',
     });
   }
 };

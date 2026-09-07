@@ -128,7 +128,7 @@ const Layout: React.FC = () => {
       <Sidebar isOpen={sidebarOpen} isMobile={isMobile} />
 
       {/* Main content */}
-      <div className={`transition-all duration-300 ${sidebarOpen && !isMobile ? 'lg:ml-64' : ''}`}>
+      <div className={`min-w-0 transition-all duration-300 ${sidebarOpen && !isMobile ? 'lg:ml-64' : ''}`}>
         {/* Top Navigation */}
         <TopNav
           onSidebarToggle={handleSidebarToggle}
@@ -139,7 +139,7 @@ const Layout: React.FC = () => {
         />
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="min-w-0 overflow-x-hidden p-4 lg:p-6">
           <Outlet />
         </main>
       </div>

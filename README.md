@@ -223,7 +223,17 @@ LOG_LEVEL=info
 
 Optional service variables are listed in `backend/.env.example` for Redis, S3, email, queues, and uploads.
 
-Current backend blocker: `backend/src/app.ts` imports `./routes/auth-simple`, but that file does not exist. Because authentication is protected for this audit, the route wiring was not changed.
+Authentication now uses the tenant-aware `backend/src/routes/auth.ts` route. Registration creates a Tenant and admin User together, product APIs derive tenant scope from JWT claims, and refresh tokens are tracked in the `sessions` collection for revocation.
+
+For production, use MongoDB Atlas or a MongoDB replica set. Tenant registration uses MongoDB transactions, which require transaction-capable MongoDB deployment topology.
+
+Run backend checks before deploy:
+
+```bash
+cd backend
+npm test -- --runInBand
+npm run build
+```
 
 ### Frontend on Vercel
 

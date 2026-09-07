@@ -136,7 +136,7 @@ productSchema.methods.isLowStock = async function (this: ProductDocument): Promi
 
   // Assuming we use the Mongoose model to sum up the InventoryItem quantities
   const InventoryItem = mongoose.model('InventoryItem');
-  const items = await InventoryItem.find({ productId: this._id, status: 'active' });
+  const items = await InventoryItem.find({ tenantId: this.tenantId, productId: this._id, status: 'active' });
 
   const totalStock = items.reduce((sum: number, inv: any) => sum + (inv.availableQuantity || inv.quantity), 0);
   return totalStock <= this.reorderLevel;
@@ -146,7 +146,7 @@ productSchema.methods.updateStock = async function (this: ProductDocument, quant
   // Creating a generic adjustment for now as a fallback since full movement logic requires 
   // warehouse context. We will just update a main inventory record if it exists.
   const InventoryItem = mongoose.model('InventoryItem');
-  let inventory = await InventoryItem.findOne({ productId: this._id, status: 'active' });
+  let inventory = await InventoryItem.findOne({ tenantId: this.tenantId, productId: this._id, status: 'active' });
 
   if (inventory) {
     inventory.quantity += quantity;

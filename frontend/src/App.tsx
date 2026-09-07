@@ -20,6 +20,7 @@ import { PaymentProcessingPage } from '@/pages/payments/PaymentProcessingPage'
 import POSTerminalPage from '@/pages/pos/POSTerminalPage'
 import DarkModePOSDemo from '@/pages/pos/DarkModePOSDemo'
 import LoginPage from '@/pages/auth/LoginPage'
+import RegisterPage from '@/pages/auth/RegisterPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { SalesPage } from '@/pages/sales/SalesPage'
 
@@ -37,16 +38,13 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
   </div>
 )
 
-const RegisterPage: React.FC = () => <PlaceholderPage title="Register" />
 const PurchasesPage: React.FC = () => <PlaceholderPage title="Purchases" />
 const HelpPage: React.FC = () => <PlaceholderPage title="Help & Support" />
 const ProfilePage: React.FC = () => <PlaceholderPage title="Profile" />
 const NotificationsPage: React.FC = () => <PlaceholderPage title="Notifications" />
 
 function App() {
-  // Use Redux state for authentication, with localStorage fallback for demo login
-  const { isAuthenticated: reduxAuth } = useSelector((state: RootState) => state.auth)
-  const isAuthenticated = reduxAuth || localStorage.getItem('isAuthenticated') === 'true'
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

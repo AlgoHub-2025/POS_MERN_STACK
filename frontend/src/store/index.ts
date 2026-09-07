@@ -12,7 +12,7 @@ import tenantSlice from './slices/tenantSlice'
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth', 'ui'], // Only persist auth and ui state
+  whitelist: ['ui'],
   blacklist: ['tenant'], // Don't persist tenant state as it should be fetched fresh
 }
 

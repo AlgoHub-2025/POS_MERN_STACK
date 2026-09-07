@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { User, LoginRequest, RegisterRequest, AuthTokens } from '@/types'
 import { authService } from '@/services/authService'
+import { setAuthTokens } from '@/services/api'
 
 interface AuthState {
   user: User | null
@@ -24,6 +25,7 @@ export const login = createAsyncThunk(
   async (credentials: LoginRequest, { rejectWithValue }) => {
     try {
       const response = await authService.login(credentials)
+      setAuthTokens(response.tokens)
       return response
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Login failed')
@@ -36,6 +38,7 @@ export const register = createAsyncThunk(
   async (userData: RegisterRequest, { rejectWithValue }) => {
     try {
       const response = await authService.register(userData)
+      setAuthTokens(response.tokens)
       return response
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Registration failed')
@@ -55,6 +58,7 @@ export const refreshToken = createAsyncThunk(
       }
 
       const response = await authService.refreshToken(refreshToken)
+      setAuthTokens(response.tokens)
       return response
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Token refresh failed')
@@ -76,6 +80,7 @@ export const logout = createAsyncThunk(
         console.error('Logout API call failed:', error)
       }
     }
+    setAuthTokens(null)
   }
 )
 

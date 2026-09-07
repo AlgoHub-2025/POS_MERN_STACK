@@ -2,70 +2,80 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { User } from '../models/User'
 
-// Extend Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        userId: string
-        email: string
-        role: string
-      }
-    }
-  }
-}
+type AuthTokenPayload = {
+  userId: string;
+  tenantId?: string;
+};
 
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Access token is required' })
+      res.status(401).json({ success: false, message: 'Access token is required' })
+      return
     }
 
-    const token = authHeader.substring(7) // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7)
 
     try {
-      // Verify the token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-      
-      // Get user from database
-      const user = await User.findById(decoded.userId)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthTokenPayload
+      const tenantId = decoded.tenantId
+
+      if (!decoded.userId || !tenantId) {
+        res.status(401).json({ success: false, message: 'Invalid or expired token' })
+        return
+      }
+
+      const user = await User.findOne({ _id: decoded.userId, tenantId })
       
       if (!user || !user.isActive) {
-        return res.status(401).json({ message: 'Invalid token or user not found' })
+        res.status(401).json({ success: false, message: 'Invalid token or user not found' })
+        return
       }
-
-      // Add user info to request
 
       if (!user.role) {
-        return res.status(403).json({ message: 'User role is not defined' })
+        res.status(403).json({ success: false, message: 'User role is not defined' })
+        return
       }
+
+    
+      if (!user.tenantId || user.tenantId.toString() !== tenantId) {
+        res.status(403).json({ success: false, message: 'User has no tenant context' })
+        return
+      }
+
       req.user = {
-        userId: user._id.toString(),
+        userId: user._id.toString(),    // ObjectId -> string
+        id: user._id.toString(),
         email: user.email,
-        role: user.role
+        role: user.role,
+        tenantId: user.tenantId.toString()
       }
 
       next()
     } catch (jwtError) {
-      return res.status(401).json({ message: 'Invalid or expired token' })
+      res.status(401).json({ success: false, message: 'Invalid or expired token' })
+      return
     }
   } catch (error) {
     console.error('Auth middleware error:', error)
-    return res.status(500).json({ message: 'Internal server error' })
+    res.status(500).json({ success: false, message: 'Internal server error' })
+    return
   }
 }
 
 // Role-based middleware
 export const requireRole = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' })
+  return (req: Request, res: Response, next: NextFunction): void => {
+   if (!req.user) {
+      res.status(401).json({ success: false, message: 'Authentication required' })
+      return
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Insufficient permissions' })
+      res.status(403).json({ success: false, message: 'Insufficient permissions' })
+      return
     }
 
     next()
@@ -80,3 +90,4 @@ export const requireManager = requireRole(['admin', 'manager'])
 
 // Any authenticated user middleware
 export const requireAuth = authMiddleware
+export const authenticateToken = authMiddleware
